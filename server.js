@@ -252,6 +252,88 @@ async function initDatabase() {
       user_id INTEGER PRIMARY KEY REFERENCES users(id),
       coach_persona TEXT DEFAULT 'encouraging'
     );
+
+    -- Streak grace days and recovery
+    CREATE TABLE IF NOT EXISTS streak_grace_days (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      grace_date TEXT NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, grace_date)
+    );
+
+    -- Milestone rewards
+    CREATE TABLE IF NOT EXISTS milestone_rewards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      milestone_type TEXT NOT NULL, -- 'streak', 'completion', 'improvement'
+      milestone_value INTEGER NOT NULL, -- e.g., 7 for 7-day streak
+      reward_title TEXT NOT NULL,
+      reward_description TEXT NOT NULL,
+      unlocked_at TEXT DEFAULT (datetime('now')),
+      claimed INTEGER DEFAULT 0,
+      claimed_at TEXT
+    );
+
+    -- AI Coach conversations
+    CREATE TABLE IF NOT EXISTS coach_conversations (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      conversation_type TEXT NOT NULL, -- 'post_session', 'weekly_checkin', 'goal_adjustment', 'qa'
+      session_id INTEGER REFERENCES sessions(id),
+      messages TEXT NOT NULL, -- JSON array of message objects
+      status TEXT DEFAULT 'active', -- 'active', 'completed', 'archived'
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Learning groups (social circles)
+    CREATE TABLE IF NOT EXISTS learning_groups (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      admin_user_id INTEGER REFERENCES users(id),
+      max_members INTEGER DEFAULT 8,
+      is_private INTEGER DEFAULT 0,
+      join_code TEXT UNIQUE,
+      group_goals TEXT, -- JSON array of goals
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Group members
+    CREATE TABLE IF NOT EXISTS group_members (
+      group_id TEXT REFERENCES learning_groups(id),
+      user_id INTEGER REFERENCES users(id),
+      joined_at TEXT DEFAULT (datetime('now')),
+      role TEXT DEFAULT 'member', -- 'admin', 'member'
+      is_active INTEGER DEFAULT 1,
+      PRIMARY KEY (group_id, user_id)
+    );
+
+    -- Group challenges
+    CREATE TABLE IF NOT EXISTS group_challenges (
+      id TEXT PRIMARY KEY,
+      group_id TEXT REFERENCES learning_groups(id),
+      challenge_type TEXT NOT NULL, -- 'completion_rate', 'improvement', 'streak'
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      target_metric TEXT NOT NULL,
+      target_value REAL NOT NULL,
+      status TEXT DEFAULT 'active', -- 'active', 'completed', 'failed'
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Group challenge participants
+    CREATE TABLE IF NOT EXISTS group_challenge_participants (
+      challenge_id TEXT REFERENCES group_challenges(id),
+      user_id INTEGER REFERENCES users(id),
+      current_value REAL DEFAULT 0,
+      completed_at TEXT,
+      PRIMARY KEY (challenge_id, user_id)
+    );
   `);
   
   console.log('Database initialized: ./data/speakup.db');
@@ -496,6 +578,217 @@ function updateStreak() {
     last_completed_date: today,
     longest_streak: Math.max(newStreak, user.longest_streak||0)
   });
+
+  // Check for milestone rewards
+  checkMilestoneRewards(newStreak, 'streak');
+}
+
+// New helper functions for next phase features
+
+function checkMilestoneRewards(value, type) {
+  const user = getUser();
+  if (!type) return;
+  
+  const milestones = {
+    streak: [7, 14, 30, 60, 100],
+    completion: [25, 50, 75, 100], // percentage completion
+    improvement: [10, 25, 50, 100] // filler reduction percentage
+  };
+  
+  if (!milestones[type] || !milestones[type].includes(value)) return;
+  
+  // Check if already unlocked
+  const stmt = db.prepare(
+    'SELECT id FROM milestone_rewards WHERE user_id=? AND milestone_type=? AND milestone_value=?'
+  );
+  const existing = stmt.getAsObject([user.id, type, value]);
+  stmt.free();
+  
+  if (existing.id) return; // already unlocked
+  
+  const rewardTitles = {
+    streak: {
+      7: 'Week Warrior',
+      14: 'Fortnight Champion',
+      30: 'Monthly Master',
+      60: 'Two-Month Titan',
+      100: 'Century Speaker'
+    },
+    completion: {
+      25: 'Quarter Complete',
+      50: 'Halfway Hero',
+      75: 'Three-Quarter Champion',
+      100: 'Program Complete'
+    }
+  };
+  
+  const rewardDescriptions = {
+    streak: {
+      7: 'Unlocked: Advanced filler analysis techniques',
+      14: 'Unlocked: Personalized AI coach conversations',
+      30: 'Unlocked: Social learning circle access',
+      60: 'Unlocked: Voice analysis features',
+      100: 'Unlocked: Master speaker certificate'
+    },
+    completion: {
+      25: 'Keep going! You\'re building momentum.',
+      50: 'Halfway there! Your confidence is growing.',
+      75: 'Almost done! The finish line is in sight.',
+      100: 'Congratulations! You\'ve completed the program.'
+    }
+  };
+  
+  const insertStmt = db.prepare(`
+    INSERT INTO milestone_rewards (user_id, milestone_type, milestone_value, reward_title, reward_description)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  insertStmt.run([
+    user.id,
+    type,
+    value,
+    rewardTitles[type]?.[value] || `Milestone: ${value}`,
+    rewardDescriptions[type]?.[value] || `Achievement unlocked: ${value} ${type}`
+  ]);
+  insertStmt.free();
+}
+
+function getStreakGraceDays(userId) {
+  const stmt = db.prepare(
+    'SELECT * FROM streak_grace_days WHERE user_id=? AND used=0 ORDER BY grace_date ASC'
+  );
+  const results = [];
+  while (stmt.step()) {
+    results.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return results;
+}
+
+function useStreakGraceDay(userId, date) {
+  const stmt = db.prepare(
+    'UPDATE streak_grace_days SET used=1 WHERE user_id=? AND grace_date=?'
+  );
+  stmt.run([userId, date]);
+  stmt.free();
+}
+
+function addStreakGraceDays(userId, days = 3) {
+  const baseDate = new Date();
+  const insertStmt = db.prepare(
+    'INSERT OR IGNORE INTO streak_grace_days (user_id, grace_date) VALUES (?, ?)'
+  );
+  
+  for (let i = 1; i <= days; i++) {
+    const graceDate = new Date(baseDate.getTime() + (i * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    insertStmt.run([userId, graceDate]);
+  }
+  insertStmt.free();
+}
+
+function getCoachConversation(conversationId) {
+  const stmt = db.prepare('SELECT * FROM coach_conversations WHERE id=?');
+  const result = stmt.getAsObject([conversationId]);
+  stmt.free();
+  return result.id ? result : null;
+}
+
+function saveCoachMessage(conversationId, message, isUser = true) {
+  const conversation = getCoachConversation(conversationId);
+  if (!conversation) return false;
+  
+  const messages = JSON.parse(conversation.messages || '[]');
+  messages.push({
+    id: nanoid(),
+    content: message,
+    isUser,
+    timestamp: new Date().toISOString()
+  });
+  
+  const updateStmt = db.prepare(
+    'UPDATE coach_conversations SET messages=?, updated_at=? WHERE id=?'
+  );
+  updateStmt.run([JSON.stringify(messages), new Date().toISOString(), conversationId]);
+  updateStmt.free();
+  return true;
+}
+
+function createCoachConversation(userId, type, sessionId = null) {
+  const conversationId = nanoid();
+  const insertStmt = db.prepare(`
+    INSERT INTO coach_conversations (id, user_id, conversation_type, session_id, messages)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  insertStmt.run([conversationId, userId, type, sessionId, '[]']);
+  insertStmt.free();
+  return conversationId;
+}
+
+function getLearningGroups(userId = null) {
+  let query = 'SELECT * FROM learning_groups';
+  let params = [];
+  
+  if (userId) {
+    query += ' WHERE admin_user_id=? OR id IN (SELECT group_id FROM group_members WHERE user_id=?)';
+    params = [userId, userId];
+  }
+  
+  query += ' ORDER BY created_at DESC';
+  
+  const stmt = db.prepare(query);
+  const results = [];
+  while (stmt.step()) {
+    results.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return results;
+}
+
+function getGroupMembers(groupId) {
+  const stmt = db.prepare(`
+    SELECT u.name, gm.joined_at, gm.role, gm.is_active
+    FROM group_members gm
+    JOIN users u ON gm.user_id = u.id
+    WHERE gm.group_id=? AND gm.is_active=1
+    ORDER BY gm.joined_at ASC
+  `);
+  const results = [];
+  while (stmt.step()) {
+    results.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return results;
+}
+
+function joinLearningGroup(groupId, userId) {
+  const insertStmt = db.prepare(`
+    INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)
+  `);
+  insertStmt.run([groupId, userId]);
+  insertStmt.free();
+}
+
+function createLearningGroup(adminUserId, name, description, maxMembers = 8, isPrivate = false) {
+  const groupId = nanoid();
+  const joinCode = isPrivate ? nanoid(8) : null;
+  
+  const insertStmt = db.prepare(`
+    INSERT INTO learning_groups (id, name, description, admin_user_id, max_members, is_private, join_code)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertStmt.run([groupId, name, description, adminUserId, maxMembers, isPrivate ? 1 : 0, joinCode]);
+  insertStmt.free();
+  
+  // Add admin as member
+  joinLearningGroup(groupId, adminUserId);
+  
+  // Update admin's role
+  const updateStmt = db.prepare(
+    'UPDATE group_members SET role=? WHERE group_id=? AND user_id=?'
+  );
+  updateStmt.run(['admin', groupId, adminUserId]);
+  updateStmt.free();
+  
+  return groupId;
 }
 
 function exportJsonBackup() {
@@ -529,6 +822,13 @@ function completeSession(day) {
   updateSession(session.id, { completed: 1 });
   updateStreak();
   updateUser({ current_day: day + 1 });
+  
+  // Add grace days for streak milestones
+  const user = getUser();
+  if (user && [7, 14, 30].includes(user.streak)) {
+    addStreakGraceDays(user.id, 3);
+  }
+  
   exportJsonBackup(); // always backup on complete
 }
 
@@ -1571,6 +1871,483 @@ app.delete('/api/user/reset', (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── NEW NEXT PHASE API ENDPOINTS ────────────────────────────────────────────
+
+// Streak and Rewards APIs
+app.get('/api/streak/status', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const graceDays = getStreakGraceDays(user.id);
+    const stmt = db.prepare(
+      'SELECT * FROM milestone_rewards WHERE user_id=? ORDER BY unlocked_at DESC'
+    );
+    const rewards = [];
+    while (stmt.step()) {
+      rewards.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    res.json({
+      currentStreak: user.streak,
+      longestStreak: user.longest_streak,
+      lastCompletedDate: user.last_completed_date,
+      graceDays: graceDays.length,
+      availableGraceDays: graceDays,
+      rewards
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/streak/recovery', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const graceDays = getStreakGraceDays(user.id);
+    if (graceDays.length === 0) {
+      return res.status(400).json({ error: 'No grace days available' });
+    }
+    
+    // Use the earliest grace day
+    const graceDay = graceDays[0];
+    useStreakGraceDay(user.id, graceDay.grace_date);
+    
+    // Extend streak by 1
+    updateUser({
+      streak: user.streak + 1,
+      last_completed_date: graceDay.grace_date
+    });
+    
+    res.json({ 
+      success: true, 
+      message: 'Streak recovered!',
+      newStreak: user.streak + 1
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/rewards/unclaimed', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const stmt = db.prepare(
+      'SELECT * FROM milestone_rewards WHERE user_id=? AND claimed=0 ORDER BY unlocked_at DESC'
+    );
+    const rewards = [];
+    while (stmt.step()) {
+      rewards.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    res.json({ rewards });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/rewards/claim/:rewardId', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { rewardId } = req.params;
+    const updateStmt = db.prepare(
+      'UPDATE milestone_rewards SET claimed=1, claimed_at=? WHERE id=? AND user_id=? AND claimed=0'
+    );
+    const result = updateStmt.run([new Date().toISOString(), rewardId, user.id]);
+    updateStmt.free();
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Reward not found or already claimed' });
+    }
+    
+    res.json({ success: true, message: 'Reward claimed!' });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// AI Coach Conversation APIs
+app.post('/api/coach/chat/start', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { type, sessionId } = req.body;
+    const conversationId = createCoachConversation(user.id, type, sessionId);
+    
+    res.json({ 
+      conversationId,
+      message: 'Coach conversation started. What would you like to discuss?'
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/coach/chat/:conversationId', async (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { conversationId } = req.params;
+    const { message } = req.body;
+    
+    const conversation = getCoachConversation(conversationId);
+    if (!conversation || conversation.user_id !== user.id) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Save user message
+    saveCoachMessage(conversationId, message, true);
+    
+    // Generate AI response based on conversation type
+    let aiPrompt = '';
+    switch (conversation.conversation_type) {
+      case 'post_session':
+        aiPrompt = `You are a professional speaking coach. A student just completed a practice session and wants to chat. Their message: "${message}". Provide encouraging, specific feedback about their speaking performance. Keep it conversational and helpful. Max 3 sentences.`;
+        break;
+      case 'weekly_checkin':
+        aiPrompt = `You are a speaking coach doing a weekly check-in. The student said: "${message}". Ask about their progress, challenges, and goals. Be supportive and ask follow-up questions. Max 3 sentences.`;
+        break;
+      case 'goal_adjustment':
+        aiPrompt = `You are a speaking coach helping adjust goals. Student said: "${message}". Suggest specific, achievable adjustments to their speaking practice goals. Be practical and encouraging. Max 3 sentences.`;
+        break;
+      case 'qa':
+        aiPrompt = `You are a speaking coach answering questions. Student asked: "${message}". Provide clear, actionable advice about public speaking techniques. Be concise but thorough. Max 4 sentences.`;
+        break;
+      default:
+        aiPrompt = `You are a friendly speaking coach. Respond helpfully to: "${message}". Keep it conversational and encouraging. Max 3 sentences.`;
+    }
+    
+    const aiResponse = await callOllama(TEXT_MODEL, aiPrompt);
+    
+    // Save AI response
+    saveCoachMessage(conversationId, aiResponse, false);
+    
+    res.json({ response: aiResponse });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/coach/conversations', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const stmt = db.prepare(
+      'SELECT * FROM coach_conversations WHERE user_id=? ORDER BY updated_at DESC'
+    );
+    const conversations = [];
+    while (stmt.step()) {
+      const conv = stmt.getAsObject();
+      conv.messages = JSON.parse(conv.messages || '[]');
+      conversations.push(conv);
+    }
+    stmt.free();
+    
+    res.json({ conversations });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Social Learning Circles APIs
+app.post('/api/groups/create', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { name, description, maxMembers, isPrivate } = req.body;
+    if (!name) return res.status(400).json({ error: 'Group name is required' });
+    
+    const groupId = createLearningGroup(user.id, name, description, maxMembers, isPrivate);
+    
+    res.json({ 
+      success: true, 
+      groupId,
+      message: 'Learning group created successfully!'
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/groups', (req, res) => {
+  try {
+    const user = getUser();
+    const groups = getLearningGroups(user?.id);
+    
+    // Add member count for each group
+    for (const group of groups) {
+      const members = getGroupMembers(group.id);
+      group.memberCount = members.length;
+      group.members = members;
+    }
+    
+    res.json({ groups });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/groups/join/:groupId', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { groupId } = req.params;
+    const { joinCode } = req.body;
+    
+    // Check if group exists and is joinable
+    const groupStmt = db.prepare('SELECT * FROM learning_groups WHERE id=?');
+    const group = groupStmt.getAsObject([groupId]);
+    groupStmt.free();
+    
+    if (!group.id) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+    
+    if (group.is_private && group.join_code !== joinCode) {
+      return res.status(403).json({ error: 'Invalid join code' });
+    }
+    
+    // Check member limit
+    const members = getGroupMembers(groupId);
+    if (members.length >= group.max_members) {
+      return res.status(400).json({ error: 'Group is full' });
+    }
+    
+    joinLearningGroup(groupId, user.id);
+    
+    res.json({ success: true, message: 'Joined group successfully!' });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/groups/:groupId/progress', (req, res) => {
+  try {
+    const user = getUser();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { groupId } = req.params;
+    
+    // Verify user is member of group
+    const memberStmt = db.prepare(
+      'SELECT 1 FROM group_members WHERE group_id=? AND user_id=? AND is_active=1'
+    );
+    const isMember = memberStmt.getAsObject([groupId, user.id]);
+    memberStmt.free();
+    
+    if (!isMember) {
+      return res.status(403).json({ error: 'Not a member of this group' });
+    }
+    
+    // Get group members' progress (anonymized)
+    const progressStmt = db.prepare(`
+      SELECT 
+        u.id,
+        u.current_day,
+        u.streak,
+        COUNT(s.id) as sessions_completed,
+        AVG(sc.overall_score) as avg_score
+      FROM group_members gm
+      JOIN users u ON gm.user_id = u.id
+      LEFT JOIN sessions s ON s.user_id = u.id AND s.completed = 1
+      LEFT JOIN scores sc ON sc.session_id = s.id
+      WHERE gm.group_id=? AND gm.is_active=1
+      GROUP BY u.id
+    `);
+    
+    const memberProgress = [];
+    while (progressStmt.step()) {
+      const progress = progressStmt.getAsObject();
+      // Anonymize by using member index instead of user ID
+      progress.memberIndex = memberProgress.length + 1;
+      delete progress.id;
+      memberProgress.push(progress);
+    }
+    progressStmt.free();
+    
+    res.json({ memberProgress });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── CRON JOBS FOR NEXT PHASE FEATURES ───────────────────────────────────────
+
+// Daily streak reminders (9 AM user timezone)
+cron.schedule('0 9 * * *', async () => {
+  try {
+    console.log('Running daily streak reminders...');
+    
+    // Get users who haven't completed today and have reminders enabled
+    const stmt = db.prepare(`
+      SELECT u.*, 
+             CASE WHEN u.last_completed_date < date('now') THEN 1 ELSE 0 END as missed_today
+      FROM users u
+      WHERE u.email IS NOT NULL 
+        AND u.reminder_time IS NOT NULL
+        AND u.unsub_token IS NOT NULL
+        AND u.streak > 0
+    `);
+    
+    const users = [];
+    while (stmt.step()) {
+      users.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    for (const user of users) {
+      if (user.missed_today) {
+        // Check if they have grace days available
+        const graceDays = getStreakGraceDays(user.id);
+        const hasGraceDays = graceDays.length > 0;
+        
+        // Send reminder email
+        const subject = hasGraceDays ? 
+          `Don't break your speaking streak! (${user.streak} days)` : 
+          `Your speaking streak is at risk! (${user.streak} days)`;
+        
+        const body = hasGraceDays ?
+          `Hi ${user.name},\n\nYou haven't practiced today, but you have ${graceDays.length} grace day(s) left to protect your ${user.streak}-day streak.\n\nComplete a quick 5-minute session to keep your momentum going!\n\n${BASE_URL}\n\nUnsubscribe: ${BASE_URL}/unsubscribe/${user.unsub_token}` :
+          `Hi ${user.name},\n\nYou haven't practiced today and your ${user.streak}-day speaking streak is about to break.\n\nComplete a session today to maintain your progress!\n\n${BASE_URL}\n\nUnsubscribe: ${BASE_URL}/unsubscribe/${user.unsub_token}`;
+        
+        try {
+          await sendEmail(user.email, subject, body);
+          console.log(`Sent streak reminder to ${user.email}`);
+        } catch (emailError) {
+          console.error(`Failed to send reminder to ${user.email}:`, emailError.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Daily reminder cron failed:', error);
+  }
+});
+
+// Weekly AI coach check-ins (Sundays at 10 AM)
+cron.schedule('0 10 * * 0', async () => {
+  try {
+    console.log('Running weekly AI coach check-ins...');
+    
+    // Get active users (completed at least one session this week)
+    const stmt = db.prepare(`
+      SELECT DISTINCT u.*
+      FROM users u
+      JOIN sessions s ON s.user_id = u.id
+      WHERE s.date >= date('now', '-7 days')
+        AND u.email IS NOT NULL
+        AND u.unsub_token IS NOT NULL
+    `);
+    
+    const users = [];
+    while (stmt.step()) {
+      users.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    for (const user of users) {
+      try {
+        // Create a weekly check-in conversation
+        const conversationId = createCoachConversation(user.id, 'weekly_checkin');
+        
+        // Generate personalized check-in message
+        const prompt = `You are a speaking coach sending a weekly check-in message to ${user.name}. They have completed ${user.current_day - 1} days of their program, have a ${user.streak}-day streak, and their goal is "${user.goal}". Write a personalized, encouraging message asking about their progress this week. Keep it under 100 words.`;
+        
+        const checkInMessage = await callOllama(TEXT_MODEL, prompt);
+        
+        // Save the AI message
+        saveCoachMessage(conversationId, checkInMessage, false);
+        
+        // Send email notification
+        const subject = 'Your Weekly Speaking Coach Check-in';
+        const body = `Hi ${user.name},\n\nYour AI coach has sent you a personalized check-in message:\n\n"${checkInMessage}"\n\nReply to continue the conversation!\n\n${BASE_URL}/coach\n\nUnsubscribe: ${BASE_URL}/unsubscribe/${user.unsub_token}`;
+        
+        await sendEmail(user.email, subject, body);
+        console.log(`Sent weekly check-in to ${user.email}`);
+      } catch (error) {
+        console.error(`Failed weekly check-in for user ${user.id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Weekly check-in cron failed:', error);
+  }
+});
+
+// Milestone celebration notifications (daily at 6 PM)
+cron.schedule('0 18 * * *', async () => {
+  try {
+    console.log('Checking for milestone celebrations...');
+    
+    // Get users with unclaimed rewards unlocked in the last 24 hours
+    const stmt = db.prepare(`
+      SELECT mr.*, u.name, u.email, u.unsub_token
+      FROM milestone_rewards mr
+      JOIN users u ON mr.user_id = u.id
+      WHERE mr.claimed = 0
+        AND mr.unlocked_at >= datetime('now', '-1 day')
+        AND u.email IS NOT NULL
+        AND u.unsub_token IS NOT NULL
+    `);
+    
+    const rewards = [];
+    while (stmt.step()) {
+      rewards.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    for (const reward of rewards) {
+      const subject = `🎉 Congratulations! ${reward.reward_title}`;
+      const body = `Hi ${reward.name},\n\nYou've unlocked a new achievement: ${reward.reward_title}\n\n${reward.reward_description}\n\nClaim your reward and see what you've unlocked!\n\n${BASE_URL}/rewards\n\nKeep up the great work!\n\nUnsubscribe: ${BASE_URL}/unsubscribe/${user.unsub_token}`;
+      
+      try {
+        await sendEmail(reward.email, subject, body);
+        console.log(`Sent milestone celebration to ${reward.email}`);
+      } catch (emailError) {
+        console.error(`Failed to send milestone email to ${reward.email}:`, emailError.message);
+      }
+    }
+  } catch (error) {
+    console.error('Milestone celebration cron failed:', error);
+  }
+});
+
+// Helper function for sending emails
+async function sendEmail(to, subject, text) {
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('SMTP not configured, skipping email send');
+    return;
+  }
+  
+  const transporter = nodemailer.createTransporter({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT || 587,
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+  
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    to,
+    subject,
+    text
+  });
+}
 
 // Start server after database initialization
 initDatabase().then(() => {
