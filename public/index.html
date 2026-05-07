@@ -1009,6 +1009,803 @@
   </style>
 </head>
 <body>
+
+<!-- ONBOARDING SCREEN -->
+<div id="onboarding" class="screen active" style="min-height: 100vh; align-items: center; justify-content: center; padding: 20px;">
+  <div style="text-align: center; width: 100%; max-width: 400px;">
+    <div style="font-size: 48px; font-weight: 600; color: var(--accent); margin-bottom: 16px; letter-spacing: -1px;">
+      SpeakUp
+    </div>
+    <div style="font-size: 16px; color: var(--text-2); margin-bottom: 40px; line-height: 1.7;">
+      Your AI speaking coach.<br>
+      Fully local, always private.
+    </div>
+    <div class="input-group">
+      <input type="text" id="input-name" placeholder="Your name" />
+    </div>
+    <div class="input-group">
+      <input type="text" id="input-goal" placeholder="Your speaking goal" />
+    </div>
+    <div class="input-group">
+      <select id="input-language">
+        <option value="">Select native language</option>
+        <option value="English">English</option>
+        <option value="Spanish">Spanish</option>
+        <option value="French">French</option>
+        <option value="Mandarin">Mandarin</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <select id="input-context">
+        <option value="work">Work presentations</option>
+        <option value="social">Social situations</option>
+        <option value="both">Both</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="initUser()">Start training</button>
+    <div style="font-size: 11px; color: var(--text-3); margin-top: 16px;">
+      Your data stays on your machine. No accounts needed.
+    </div>
+  </div>
+</div>
+
+<!-- HOME/DASHBOARD SCREEN -->
+<div id="home" class="screen" style="min-height: 100vh; padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title" onclick="goToScreen('profile')" style="cursor: pointer;">
+      👤 <span id="header-name">Profile</span>
+    </div>
+    <div class="header-right">
+      <div class="streak-badge">
+        🔥 <span id="streak-display">0</span>
+      </div>
+      <button class="btn-nav" onclick="goToScreen('rewards')">Rewards</button>
+      <button class="btn-nav" onclick="goToScreen('groups')">Groups</button>
+    </div>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <!-- TODAY'S PRACTICE CARD -->
+    <div class="card" style="background: linear-gradient(135deg, rgba(212,255,77,0.1) 0%, rgba(212,255,77,0.05) 100%); border-color: var(--accent-border);">
+      <div class="card-title">Today's Practice</div>
+      <div class="card-value" id="today-status">Ready</div>
+      <div class="card-label">Complete one habit to build your streak</div>
+      <button class="btn-primary" onclick="goToScreen('habits')" style="margin-top: 16px;">Start session</button>
+    </div>
+
+    <!-- QUICK STATS -->
+    <div class="grid-2" style="margin-bottom: 16px;">
+      <div class="stat-item">
+        <div class="stat-value" id="current-streak">0</div>
+        <div class="stat-label">Current streak</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="longest-streak">0</div>
+        <div class="stat-label">Longest streak</div>
+      </div>
+    </div>
+
+    <!-- COACH MESSAGE -->
+    <div class="card" id="coach-card" style="display: none;">
+      <div class="card-title">🤖 Coach Check-in</div>
+      <div id="coach-message" style="font-size: 14px; color: var(--text-2); line-height: 1.7; margin-bottom: 12px;"></div>
+      <button class="btn-secondary" onclick="goToScreen('coach')" style="width: 100%;">Continue conversation</button>
+    </div>
+
+    <!-- REWARDS PREVIEW -->
+    <div class="card" id="rewards-card" style="display: none;">
+      <div class="card-title">🎁 New achievements</div>
+      <div id="rewards-count" style="font-size: 14px; color: var(--text-2); margin-bottom: 12px;"></div>
+      <button class="btn-secondary" onclick="goToScreen('rewards')" style="width: 100%;">Claim rewards</button>
+    </div>
+
+    <!-- GROUPS ACTIVITY -->
+    <div class="card" id="groups-card" style="display: none;">
+      <div class="card-title">👥 Your circles</div>
+      <div id="groups-status" style="font-size: 14px; color: var(--text-2); margin-bottom: 12px;"></div>
+      <button class="btn-secondary" onclick="goToScreen('groups')" style="width: 100%;">View groups</button>
+    </div>
+
+    <!-- GRACE DAY INFO -->
+    <div class="card" id="grace-card" style="background: var(--warning-bg); border-color: rgba(255,170,51,0.3); display: none;">
+      <div class="card-title" style="color: var(--warning);">⏰ Streak protection active</div>
+      <div id="grace-info" style="font-size: 14px; color: var(--text-2); margin-bottom: 12px;"></div>
+      <button class="btn-secondary" onclick="goToScreen('streak')" style="width: 100%;">View streak status</button>
+    </div>
+  </div>
+</div>
+
+<!-- HABITS SCREEN -->
+<div id="habits" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Today's habits</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div id="habits-list">
+      <div class="loading">Loading habits...</div>
+    </div>
+    <button class="btn-secondary" onclick="logPracticeSession()" style="margin-top: 20px;">✓ Mark session complete</button>
+  </div>
+</div>
+
+<!-- COACH SCREEN -->
+<div id="coach" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">AI Coach</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0; display: flex; flex-direction: column; min-height: 80vh;">
+    <div id="coach-messages" style="flex: 1; overflow-y: auto; margin-bottom: 20px;">
+      <div class="loading">Starting conversation...</div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <input type="text" id="coach-input" placeholder="Ask your coach..." />
+      <button class="btn-primary" onclick="sendCoachMessage()" style="width: 60px; padding: 12px;">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- REWARDS SCREEN -->
+<div id="rewards" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Achievements</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div style="margin-bottom: 20px;">
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchRewardsTab('unclaimed')">Unclaimed</button>
+        <button class="nav-tab" onclick="switchRewardsTab('claimed')">Claimed</button>
+      </div>
+    </div>
+    <div id="rewards-list">
+      <div class="loading">Loading rewards...</div>
+    </div>
+  </div>
+</div>
+
+<!-- GROUPS SCREEN -->
+<div id="groups" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Learning circles</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div style="margin-bottom: 20px;">
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchGroupsTab('joined')">My groups</button>
+        <button class="nav-tab" onclick="switchGroupsTab('explore')">Explore</button>
+      </div>
+    </div>
+
+    <div id="groups-tab-joined" style="display: block;">
+      <div id="joined-groups-list">
+        <div class="loading">Loading groups...</div>
+      </div>
+      <button class="btn-primary" onclick="showCreateGroupForm()" style="margin-top: 20px;">+ Create group</button>
+    </div>
+
+    <div id="groups-tab-explore" style="display: none;">
+      <div id="explore-groups-list">
+        <div class="loading">Loading groups...</div>
+      </div>
+    </div>
+
+    <div id="create-group-form" style="display: none; margin-top: 20px;">
+      <div class="input-group">
+        <input type="text" id="group-name" placeholder="Group name" />
+      </div>
+      <div class="input-group">
+        <textarea id="group-desc" placeholder="Description" style="min-height: 80px;"></textarea>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-primary" onclick="createGroup()">Create</button>
+        <button class="btn-secondary" onclick="document.getElementById('create-group-form').style.display='none'" style="flex: 1;">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STREAK SCREEN -->
+<div id="streak" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Streak status</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div class="card">
+      <div class="card-title">🔥 Current streak</div>
+      <div class="card-value" id="streak-current">0</div>
+      <div class="card-label">Days in a row</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⭐ Longest streak</div>
+      <div class="card-value" id="streak-longest">0</div>
+      <div class="card-label">All-time record</div>
+    </div>
+
+    <div class="card" id="grace-days-card" style="display: none;">
+      <div class="card-title">⏰ Grace days</div>
+      <div class="card-value" id="grace-days-count">0</div>
+      <div class="card-label">Days to protect your streak</div>
+      <button class="btn-primary" onclick="useGraceDay()" style="margin-top: 16px;">Use a grace day</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE SCREEN -->
+<div id="profile" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Profile</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div class="card">
+      <div class="card-title">👤 Your profile</div>
+      <div id="profile-info" style="color: var(--text-2); font-size: 14px; line-height: 1.8;">
+        <div style="margin-bottom: 12px;"><strong style="color: var(--text);">Name:</strong> <span id="profile-name">—</span></div>
+        <div style="margin-bottom: 12px;"><strong style="color: var(--text);">Goal:</strong> <span id="profile-goal">—</span></div>
+        <div style="margin-bottom: 12px;"><strong style="color: var(--text);">Native language:</strong> <span id="profile-lang">—</span></div>
+        <div style="margin-bottom: 12px;"><strong style="color: var(--text);">Context:</strong> <span id="profile-context">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 Statistics</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="stat-item">
+          <div class="stat-value" id="stat-total-minutes">0</div>
+          <div class="stat-label">Total minutes</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stat-sessions">0</div>
+          <div class="stat-label">Sessions</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-secondary" onclick="resetData()" style="margin-top: 20px; border-color: var(--danger); color: var(--danger);">Reset all data</button>
+  </div>
+</div>
+
+<script>
+// === STATE MANAGEMENT ===
+const app = {
+  user: null,
+  streakStatus: null,
+  rewards: null,
+  conversations: [],
+  groups: [],
+  currentScreen: 'onboarding',
+  currentRewardsTab: 'unclaimed',
+  currentGroupsTab: 'joined',
+  coachConvId: null
+};
+
+const api = 'http://localhost:3000/api';
+
+// === INITIALIZATION ===
+async function initApp() {
+  loadSession();
+  if (app.user) {
+    goToScreen('home');
+    loadDashboard();
+  }
+}
+
+function loadSession() {
+  const saved = localStorage.getItem('speakup_user');
+  if (saved) {
+    app.user = JSON.parse(saved);
+  }
+}
+
+function saveSession() {
+  localStorage.setItem('speakup_user', JSON.stringify(app.user));
+}
+
+// === ONBOARDING ===
+async function initUser() {
+  const name = document.getElementById('input-name').value.trim();
+  const goal = document.getElementById('input-goal').value.trim();
+  const lang = document.getElementById('input-language').value;
+  const context = document.getElementById('input-context').value;
+
+  if (!name || !goal || !lang || !context) {
+    showToast('Please fill all fields');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${api}/user/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, goal, nativeLanguage: lang, speakingContext: context
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to create user');
+    
+    app.user = data.user;
+    saveSession();
+    goToScreen('home');
+    loadDashboard();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+// === NAVIGATION ===
+function goToScreen(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screen).classList.add('active');
+  app.currentScreen = screen;
+  
+  if (screen === 'home') loadDashboard();
+  if (screen === 'habits') loadHabits();
+  if (screen === 'coach') initCoach();
+  if (screen === 'rewards') loadRewards();
+  if (screen === 'groups') loadGroups();
+  if (screen === 'streak') loadStreakStatus();
+  if (screen === 'profile') loadProfile();
+}
+
+// === HOME/DASHBOARD ===
+async function loadDashboard() {
+  try {
+    const [userRes, streakRes, rewardsRes, groupsRes, coachRes] = await Promise.all([
+      fetch(`${api}/user`),
+      fetch(`${api}/streak/status`),
+      fetch(`${api}/rewards/unclaimed`),
+      fetch(`${api}/groups`),
+      fetch(`${api}/coach/conversations`)
+    ]);
+
+    if (userRes.ok) {
+      app.user = await userRes.json();
+      document.getElementById('header-name').textContent = app.user.name || 'User';
+      document.getElementById('profile-name').textContent = app.user.name;
+      document.getElementById('profile-goal').textContent = app.user.goal;
+      document.getElementById('profile-lang').textContent = app.user.native_language;
+      document.getElementById('profile-context').textContent = app.user.target_speaking_context;
+    }
+
+    if (streakRes.ok) {
+      app.streakStatus = await streakRes.json();
+      document.getElementById('current-streak').textContent = app.streakStatus.currentStreak || 0;
+      document.getElementById('longest-streak').textContent = app.streakStatus.longestStreak || 0;
+      document.getElementById('streak-display').textContent = app.streakStatus.currentStreak || 0;
+      
+      if (app.streakStatus.graceDaysAvailable > 0) {
+        document.getElementById('grace-card').style.display = 'block';
+        document.getElementById('grace-info').textContent = `You have ${app.streakStatus.graceDaysAvailable} grace days to protect your streak if you miss a day.`;
+      }
+    }
+
+    if (rewardsRes.ok) {
+      const rewards = await rewardsRes.json();
+      if (rewards.length > 0) {
+        document.getElementById('rewards-card').style.display = 'block';
+        document.getElementById('rewards-count').textContent = `You have ${rewards.length} new achievement${rewards.length !== 1 ? 's' : ''} to claim!`;
+      }
+    }
+
+    if (groupsRes.ok) {
+      app.groups = await groupsRes.json();
+      if (app.groups.length > 0) {
+        document.getElementById('groups-card').style.display = 'block';
+        document.getElementById('groups-status').textContent = `You're in ${app.groups.length} group${app.groups.length !== 1 ? 's' : ''}.`;
+      }
+    }
+
+    if (coachRes.ok) {
+      app.conversations = await coachRes.json();
+      if (app.conversations.length > 0) {
+        const latest = app.conversations[app.conversations.length - 1];
+        document.getElementById('coach-card').style.display = 'block';
+        document.getElementById('coach-message').textContent = latest.latest_message || 'You have unread coach messages.';
+        app.coachConvId = latest.id;
+      }
+    }
+  } catch (err) {
+    console.error('Dashboard error:', err);
+  }
+}
+
+// === HABITS ===
+async function loadHabits() {
+  try {
+    const res = await fetch(`${api}/progress`);
+    const data = await res.json();
+    
+    const list = document.getElementById('habits-list');
+    list.innerHTML = '';
+    
+    if (!data.habits || data.habits.length === 0) {
+      list.innerHTML = '<div class="card">No habits recorded yet.</div>';
+      return;
+    }
+
+    data.habits.forEach(habit => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <div class="card-title">${habit.name}</div>
+            <div style="color: var(--text-3); font-size: 12px;">
+              ${habit.description || 'Daily habit'}
+            </div>
+          </div>
+          <div style="font-size: 20px;">
+            ${habit.completed ? '✓' : '◯'}
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  } catch (err) {
+    console.error('Habits error:', err);
+  }
+}
+
+async function logPracticeSession() {
+  try {
+    const res = await fetch(`${api}/session/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration: 5 })
+    });
+    
+    if (res.ok) {
+      showToast('✓ Session logged! Keep up the streak.');
+      setTimeout(() => {
+        goToScreen('home');
+        loadDashboard();
+      }, 800);
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+}
+
+// === COACH ===
+async function initCoach() {
+  if (!app.coachConvId) {
+    try {
+      const res = await fetch(`${api}/coach/chat/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'daily_check_in',
+          message: 'Hello coach, let\'s work on my speaking today.'
+        })
+      });
+      const data = await res.json();
+      app.coachConvId = data.conversationId;
+    } catch (err) {
+      console.error('Coach init error:', err);
+    }
+  }
+  loadCoachMessages();
+}
+
+async function loadCoachMessages() {
+  try {
+    const res = await fetch(`${api}/coach/conversations`);
+    const convs = await res.json();
+    
+    if (convs.length === 0) {
+      document.getElementById('coach-messages').innerHTML = '<div class="card">No messages yet.</div>';
+      return;
+    }
+
+    const conv = convs[convs.length - 1];
+    const messages = conv.messages || [];
+    
+    const msgs = document.getElementById('coach-messages');
+    msgs.innerHTML = messages.map(msg => `
+      <div style="
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        background: ${msg.role === 'user' ? 'var(--accent-bg)' : 'var(--bg-card)'};
+        border: 0.5px solid ${msg.role === 'user' ? 'var(--accent-border)' : 'var(--border)'};
+        border-radius: var(--radius);
+        color: ${msg.role === 'user' ? 'var(--accent)' : 'var(--text-2)'};
+      ">
+        ${msg.text}
+      </div>
+    `).join('');
+    
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch (err) {
+    console.error('Load messages error:', err);
+  }
+}
+
+async function sendCoachMessage() {
+  const input = document.getElementById('coach-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  
+  input.value = '';
+  
+  try {
+    if (!app.coachConvId) {
+      const startRes = await fetch(`${api}/coach/chat/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'user_query', message: msg })
+      });
+      const data = await startRes.json();
+      app.coachConvId = data.conversationId;
+    } else {
+      await fetch(`${api}/coach/chat/${app.coachConvId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg })
+      });
+    }
+    loadCoachMessages();
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+}
+
+// === REWARDS ===
+async function loadRewards() {
+  try {
+    const unclaimedRes = await fetch(`${api}/rewards/unclaimed`);
+    const unclaimed = unclaimedRes.ok ? await unclaimedRes.json() : [];
+    
+    const list = document.getElementById('rewards-list');
+    
+    if (app.currentRewardsTab === 'unclaimed') {
+      if (unclaimed.length === 0) {
+        list.innerHTML = '<div class="card">No unclaimed rewards yet. Keep practicing!</div>';
+        return;
+      }
+      
+      list.innerHTML = unclaimed.map(r => `
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <div class="card-title">${r.reward_title}</div>
+              <div style="color: var(--text-3); font-size: 12px; margin-bottom: 12px;">
+                ${r.reward_description}
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="claimReward(${r.id})">Claim reward</button>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    console.error('Rewards error:', err);
+  }
+}
+
+async function claimReward(rewardId) {
+  try {
+    const res = await fetch(`${api}/rewards/claim/${rewardId}`, {
+      method: 'POST'
+    });
+    if (res.ok) {
+      showToast('🎉 Reward claimed!');
+      loadRewards();
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+}
+
+function switchRewardsTab(tab) {
+  app.currentRewardsTab = tab;
+  document.querySelectorAll('#rewards .nav-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', (i === 0 && tab === 'unclaimed') || (i === 1 && tab === 'claimed'));
+  });
+  loadRewards();
+}
+
+// === GROUPS ===
+async function loadGroups() {
+  try {
+    const res = await fetch(`${api}/groups`);
+    const groups = await res.json();
+    app.groups = groups;
+
+    if (app.currentGroupsTab === 'joined') {
+      const list = document.getElementById('joined-groups-list');
+      const joined = groups.filter(g => g.is_member);
+      
+      if (joined.length === 0) {
+        list.innerHTML = '<div class="card">You haven\'t joined any groups yet. Create one or explore available groups!</div>';
+      } else {
+        list.innerHTML = joined.map(g => `
+          <div class="card">
+            <div class="card-title">${g.name}</div>
+            <div style="color: var(--text-3); font-size: 12px; margin-bottom: 12px;">
+              ${g.description || 'Group for speaking practice'}
+            </div>
+            <button class="btn-secondary" onclick="viewGroupProgress(${g.id})" style="width: 100%;">View progress</button>
+          </div>
+        `).join('');
+      }
+    } else {
+      const list = document.getElementById('explore-groups-list');
+      const available = groups.filter(g => !g.is_member);
+      
+      if (available.length === 0) {
+        list.innerHTML = '<div class="card">No other groups available. Create your own!</div>';
+      } else {
+        list.innerHTML = available.map(g => `
+          <div class="card">
+            <div class="card-title">${g.name}</div>
+            <div style="color: var(--text-3); font-size: 12px; margin-bottom: 12px;">
+              ${g.description || 'Group for speaking practice'}
+            </div>
+            <button class="btn-primary" onclick="joinGroup(${g.id})">Join group</button>
+          </div>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Groups error:', err);
+  }
+}
+
+function switchGroupsTab(tab) {
+  app.currentGroupsTab = tab;
+  document.getElementById('groups-tab-joined').style.display = tab === 'joined' ? 'block' : 'none';
+  document.getElementById('groups-tab-explore').style.display = tab === 'explore' ? 'block' : 'none';
+  document.querySelectorAll('#groups .nav-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', (i === 0 && tab === 'joined') || (i === 1 && tab === 'explore'));
+  });
+  loadGroups();
+}
+
+function showCreateGroupForm() {
+  document.getElementById('create-group-form').style.display = 'block';
+}
+
+async function createGroup() {
+  const name = document.getElementById('group-name').value.trim();
+  const desc = document.getElementById('group-desc').value.trim();
+  
+  if (!name) {
+    showToast('Group name required');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${api}/groups/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description: desc, goals: [] })
+    });
+    
+    if (res.ok) {
+      showToast('✓ Group created!');
+      document.getElementById('create-group-form').style.display = 'none';
+      document.getElementById('group-name').value = '';
+      document.getElementById('group-desc').value = '';
+      loadGroups();
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+}
+
+async function joinGroup(groupId) {
+  try {
+    const res = await fetch(`${api}/groups/join/${groupId}`, {
+      method: 'POST'
+    });
+    if (res.ok) {
+      showToast('✓ Joined group!');
+      loadGroups();
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+}
+
+async function viewGroupProgress(groupId) {
+  try {
+    const res = await fetch(`${api}/groups/${groupId}/progress`);
+    const progress = await res.json();
+    showToast(`Group progress: ${progress.totalMembers} members`);
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+}
+
+// === STREAK ===
+async function loadStreakStatus() {
+  try {
+    const res = await fetch(`${api}/streak/status`);
+    const streak = await res.json();
+    
+    document.getElementById('streak-current').textContent = streak.currentStreak || 0;
+    document.getElementById('streak-longest').textContent = streak.longestStreak || 0;
+    
+    if (streak.graceDaysAvailable > 0) {
+      document.getElementById('grace-days-card').style.display = 'block';
+      document.getElementById('grace-days-count').textContent = streak.graceDaysAvailable;
+    }
+  } catch (err) {
+    console.error('Streak error:', err);
+  }
+}
+
+async function useGraceDay() {
+  try {
+    const res = await fetch(`${api}/streak/recovery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ useGraceDay: true })
+    });
+    
+    if (res.ok) {
+      showToast('✓ Grace day used! Your streak is protected.');
+      loadStreakStatus();
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message);
+  }
+}
+
+// === PROFILE ===
+async function loadProfile() {
+  if (!app.user) return;
+  
+  try {
+    const res = await fetch(`${api}/user`);
+    const user = await res.json();
+    
+    document.getElementById('profile-name').textContent = user.name;
+    document.getElementById('profile-goal').textContent = user.goal;
+    document.getElementById('profile-lang').textContent = user.native_language;
+    document.getElementById('profile-context').textContent = user.target_speaking_context;
+    document.getElementById('stat-total-minutes').textContent = user.total_minutes_practiced || 0;
+    document.getElementById('stat-sessions').textContent = user.current_day || 0;
+  } catch (err) {
+    console.error('Profile error:', err);
+  }
+}
+
+function resetData() {
+  if (confirm('Are you sure? This will reset all your data and start over.')) {
+    localStorage.clear();
+    location.reload();
+  }
+}
+
+// === UTILITIES ===
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Init
+initApp();
+</script>
+
+</body>
+</html>
   <!-- ONBOARDING SCREEN -->
   <div id="onboarding-screen" style="
     position: fixed; inset: 0; z-index: 10000;
