@@ -1006,6 +1006,137 @@
       color: #ff4444;
       border: 0.5px solid rgba(255,68,68,0.3);
     }
+
+    /* VOICE RECORDING */
+    .voice-recorder {
+      background: var(--bg-card);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .record-button {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 3px solid var(--danger);
+      background: transparent;
+      color: var(--danger);
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 20px auto;
+      transition: all 0.2s;
+    }
+
+    .record-button.recording {
+      background: var(--danger);
+      color: white;
+      animation: pulse 2s infinite;
+    }
+
+    .voice-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .metric-card {
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      text-align: center;
+    }
+
+    .metric-score {
+      font-size: 24px;
+      font-family: 'JetBrains Mono';
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .voice-feedback {
+      margin-top: 16px;
+      padding: 12px;
+      background: var(--bg-input);
+      border-radius: var(--radius);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* PROGRESS INSIGHTS */
+    .insights-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .insight-card {
+      background: var(--bg-card);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .insight-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .insight-desc {
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+
+    /* GROUP CHALLENGES */
+    .challenge-card {
+      background: var(--bg-card);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .challenge-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .challenge-meta {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-bottom: 12px;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+
+    /* PWA STYLES */
+    @media all and (display-mode: standalone) {
+      body {
+        padding-bottom: 40px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1100,6 +1231,20 @@
       <button class="btn-secondary" onclick="goToScreen('rewards')" style="width: 100%;">Claim rewards</button>
     </div>
 
+    <!-- VOICE PRACTICE -->
+    <div class="card">
+      <div class="card-title">🎤 Voice practice</div>
+      <div style="font-size: 14px; color: var(--text-2); margin-bottom: 12px;">Record and analyze your speaking with AI feedback</div>
+      <button class="btn-secondary" onclick="goToScreen('voice')" style="width: 100%;">Start practicing</button>
+    </div>
+
+    <!-- PROGRESS INSIGHTS -->
+    <div class="card">
+      <div class="card-title">📈 Progress insights</div>
+      <div style="font-size: 14px; color: var(--text-2); margin-bottom: 12px;">See your improvement trends and milestones</div>
+      <button class="btn-secondary" onclick="goToScreen('insights')" style="width: 100%;">View insights</button>
+    </div>
+
     <!-- GROUPS ACTIVITY -->
     <div class="card" id="groups-card" style="display: none;">
       <div class="card-title">👥 Your circles</div>
@@ -1181,6 +1326,7 @@
       <div class="nav-tabs">
         <button class="nav-tab active" onclick="switchGroupsTab('joined')">My groups</button>
         <button class="nav-tab" onclick="switchGroupsTab('explore')">Explore</button>
+        <button class="nav-tab" onclick="switchGroupsTab('challenges')">Challenges</button>
       </div>
     </div>
 
@@ -1195,6 +1341,13 @@
       <div id="explore-groups-list">
         <div class="loading">Loading groups...</div>
       </div>
+    </div>
+
+    <div id="groups-tab-challenges" style="display: none;">
+      <div id="challenges-list">
+        <div class="loading">Loading challenges...</div>
+      </div>
+      <button class="btn-primary" onclick="createChallenge()" style="margin-top: 20px;">+ Create challenge</button>
     </div>
 
     <div id="create-group-form" style="display: none; margin-top: 20px;">
@@ -1274,6 +1427,105 @@
     </div>
 
     <button class="btn-secondary" onclick="resetData()" style="margin-top: 20px; border-color: var(--danger); color: var(--danger);">Reset all data</button>
+  </div>
+</div>
+
+<!-- VOICE RECORDING SCREEN -->
+<div id="voice" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Voice Practice</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div class="voice-recorder">
+      <div style="margin-bottom: 16px;">
+        <div class="card-title">🎤 Practice Session</div>
+        <div id="current-prompt" style="color: var(--text-2); font-size: 14px; margin-top: 8px;">
+          Click "Get Prompt" to start practicing
+        </div>
+      </div>
+
+      <button id="record-btn" class="record-button" onclick="toggleRecording()">
+        <span id="record-icon">●</span>
+      </button>
+
+      <div style="margin-top: 16px;">
+        <div id="recording-timer" style="font-family: 'JetBrains Mono'; font-size: 18px; color: var(--text-2); display: none;">
+          00:00
+        </div>
+        <div id="recording-status" style="font-size: 14px; color: var(--text-3); margin-top: 8px;">
+          Ready to record
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <button class="btn-primary" onclick="getSmartPrompt()" style="margin-right: 12px;">Get Smart Prompt</button>
+      <button class="btn-secondary" onclick="viewRecordingHistory()">View History</button>
+    </div>
+
+    <div id="analysis-results" style="display: none; margin-top: 20px;">
+      <div class="card">
+        <div class="card-title">📊 Analysis Results</div>
+        <div class="voice-metrics">
+          <div class="metric-card">
+            <div class="metric-score" id="confidence-score">—</div>
+            <div style="font-size: 12px; color: var(--text-3);">Confidence</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-score" id="clarity-score">—</div>
+            <div style="font-size: 12px; color: var(--text-3);">Clarity</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-score" id="engagement-score">—</div>
+            <div style="font-size: 12px; color: var(--text-3);">Engagement</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-score" id="speaking-rate">—</div>
+            <div style="font-size: 12px; color: var(--text-3);">WPM</div>
+          </div>
+        </div>
+        <div id="voice-feedback" class="voice-feedback"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESS INSIGHTS SCREEN -->
+<div id="insights" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Progress Insights</div>
+    <button class="btn-nav" onclick="goToScreen('home')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div class="card">
+      <div class="card-title">📈 Your Progress</div>
+      <div id="insights-list" class="insights-list">
+        <div style="text-align: center; color: var(--text-3); padding: 40px;">
+          Loading insights...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP CHALLENGES SCREEN -->
+<div id="challenges" class="screen" style="padding-bottom: 40px;">
+  <div class="header">
+    <div class="header-title">Group Challenges</div>
+    <button class="btn-nav" onclick="goToScreen('groups')">← Back</button>
+  </div>
+
+  <div style="padding: 20px 0;">
+    <div id="challenges-list">
+      <div style="text-align: center; color: var(--text-3); padding: 40px;">
+        Loading challenges...
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="createChallenge()" style="margin-top: 20px;">Create Challenge</button>
   </div>
 </div>
 
@@ -1358,6 +1610,16 @@ function goToScreen(screen) {
   if (screen === 'groups') loadGroups();
   if (screen === 'streak') loadStreakStatus();
   if (screen === 'profile') loadProfile();
+  if (screen === 'voice') {
+    // Reset voice recording state
+    document.getElementById('analysis-results').style.display = 'none';
+    document.getElementById('recording-timer').style.display = 'none';
+    document.getElementById('recording-status').textContent = 'Ready to record';
+    document.getElementById('record-btn').classList.remove('recording');
+    document.getElementById('record-icon').textContent = '●';
+  }
+  if (screen === 'insights') loadInsights();
+  if (screen === 'challenges') loadChallenges();
 }
 
 // === HOME/DASHBOARD ===
@@ -1372,7 +1634,12 @@ async function loadDashboard() {
     ]);
 
     if (userRes.ok) {
-      app.user = await userRes.json();
+      const userData = await userRes.json();
+      if (userData.exists === false) {
+        goToScreen('onboarding');
+        return;
+      }
+      app.user = userData.user;
       document.getElementById('header-name').textContent = app.user.name || 'User';
       document.getElementById('profile-name').textContent = app.user.name;
       document.getElementById('profile-goal').textContent = app.user.goal;
@@ -1393,7 +1660,8 @@ async function loadDashboard() {
     }
 
     if (rewardsRes.ok) {
-      const rewards = await rewardsRes.json();
+      const rewardsData = await rewardsRes.json();
+      const rewards = rewardsData.rewards || [];
       if (rewards.length > 0) {
         document.getElementById('rewards-card').style.display = 'block';
         document.getElementById('rewards-count').textContent = `You have ${rewards.length} new achievement${rewards.length !== 1 ? 's' : ''} to claim!`;
@@ -1401,15 +1669,18 @@ async function loadDashboard() {
     }
 
     if (groupsRes.ok) {
-      app.groups = await groupsRes.json();
-      if (app.groups.length > 0) {
+      const groupsData = await groupsRes.json();
+      app.groups = groupsData.groups || [];
+      const joinedCount = app.groups.filter(g => g.is_member).length;
+      if (joinedCount > 0) {
         document.getElementById('groups-card').style.display = 'block';
-        document.getElementById('groups-status').textContent = `You're in ${app.groups.length} group${app.groups.length !== 1 ? 's' : ''}.`;
+        document.getElementById('groups-status').textContent = `You're in ${joinedCount} group${joinedCount !== 1 ? 's' : ''}.`;
       }
     }
 
     if (coachRes.ok) {
-      app.conversations = await coachRes.json();
+      const coachData = await coachRes.json();
+      app.conversations = coachData.conversations || [];
       if (app.conversations.length > 0) {
         const latest = app.conversations[app.conversations.length - 1];
         document.getElementById('coach-card').style.display = 'block';
@@ -1503,7 +1774,8 @@ async function initCoach() {
 async function loadCoachMessages() {
   try {
     const res = await fetch(`${api}/coach/conversations`);
-    const convs = await res.json();
+    const coachData = await res.json();
+    const convs = coachData.conversations || [];
     
     if (convs.length === 0) {
       document.getElementById('coach-messages').innerHTML = '<div class="card">No messages yet.</div>';
@@ -1566,7 +1838,8 @@ async function sendCoachMessage() {
 async function loadRewards() {
   try {
     const unclaimedRes = await fetch(`${api}/rewards/unclaimed`);
-    const unclaimed = unclaimedRes.ok ? await unclaimedRes.json() : [];
+    const unclaimedData = unclaimedRes.ok ? await unclaimedRes.json() : { rewards: [] };
+    const unclaimed = unclaimedData.rewards || [];
     
     const list = document.getElementById('rewards-list');
     
@@ -1621,7 +1894,8 @@ function switchRewardsTab(tab) {
 async function loadGroups() {
   try {
     const res = await fetch(`${api}/groups`);
-    const groups = await res.json();
+    const groupsData = await res.json();
+    const groups = groupsData.groups || [];
     app.groups = groups;
 
     if (app.currentGroupsTab === 'joined') {
@@ -1668,10 +1942,16 @@ function switchGroupsTab(tab) {
   app.currentGroupsTab = tab;
   document.getElementById('groups-tab-joined').style.display = tab === 'joined' ? 'block' : 'none';
   document.getElementById('groups-tab-explore').style.display = tab === 'explore' ? 'block' : 'none';
+  document.getElementById('groups-tab-challenges').style.display = tab === 'challenges' ? 'block' : 'none';
   document.querySelectorAll('#groups .nav-tab').forEach((btn, i) => {
-    btn.classList.toggle('active', (i === 0 && tab === 'joined') || (i === 1 && tab === 'explore'));
+    btn.classList.toggle('active', (i === 0 && tab === 'joined') || (i === 1 && tab === 'explore') || (i === 2 && tab === 'challenges'));
   });
-  loadGroups();
+  
+  if (tab === 'challenges') {
+    loadChallenges();
+  } else {
+    loadGroups();
+  }
 }
 
 function showCreateGroupForm() {
@@ -1771,7 +2051,9 @@ async function loadProfile() {
   
   try {
     const res = await fetch(`${api}/user`);
-    const user = await res.json();
+    const userData = await res.json();
+    if (userData.exists === false) return;
+    const user = userData.user;
     
     document.getElementById('profile-name').textContent = user.name;
     document.getElementById('profile-goal').textContent = user.goal;
@@ -1791,6 +2073,265 @@ function resetData() {
   }
 }
 
+// === VOICE RECORDING ===
+
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingStartTime = null;
+let recordingTimer = null;
+let currentPrompt = null;
+
+async function getSmartPrompt() {
+  try {
+    const res = await fetch(`${api}/prompts/smart`);
+    const data = await res.json();
+    
+    currentPrompt = data.prompt;
+    document.getElementById('current-prompt').textContent = data.prompt;
+    document.getElementById('current-prompt').style.color = 'var(--text)';
+    
+    showToast('Smart prompt loaded!');
+  } catch (err) {
+    showToast('Failed to load prompt');
+  }
+}
+
+async function toggleRecording() {
+  const btn = document.getElementById('record-btn');
+  const icon = document.getElementById('record-icon');
+  const timer = document.getElementById('recording-timer');
+  const status = document.getElementById('recording-status');
+  
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+    // Start recording
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        await analyzeRecording(audioBlob);
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      recordingStartTime = Date.now();
+      
+      btn.classList.add('recording');
+      icon.textContent = '■';
+      timer.style.display = 'block';
+      status.textContent = 'Recording...';
+      
+      // Start timer
+      recordingTimer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const seconds = (elapsed % 60).toString().padStart(2, '0');
+        timer.textContent = `${minutes}:${seconds}`;
+      }, 1000);
+      
+    } catch (err) {
+      showToast('Microphone access denied');
+    }
+  } else {
+    // Stop recording
+    mediaRecorder.stop();
+    clearInterval(recordingTimer);
+    
+    btn.classList.remove('recording');
+    icon.textContent = '●';
+    status.textContent = 'Analyzing...';
+  }
+}
+
+async function analyzeRecording(audioBlob) {
+  try {
+    const base64 = await blobToBase64(audioBlob);
+    const res = await fetch(`${api}/voice/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audioData: base64,
+        promptText: currentPrompt || '',
+        duration: Math.floor((Date.now() - recordingStartTime) / 1000)
+      })
+    });
+    
+    const data = await res.json();
+    
+    // Update UI with results
+    document.getElementById('confidence-score').textContent = data.analysis.confidence;
+    document.getElementById('clarity-score').textContent = data.analysis.clarity;
+    document.getElementById('engagement-score').textContent = data.analysis.engagement;
+    document.getElementById('speaking-rate').textContent = data.analysis.speakingRate;
+    
+    document.getElementById('voice-feedback').innerHTML = data.analysis.feedback.map(f => `• ${f}`).join('<br>');
+    
+    document.getElementById('analysis-results').style.display = 'block';
+    document.getElementById('recording-timer').style.display = 'none';
+    document.getElementById('recording-status').textContent = 'Analysis complete!';
+    
+    // Update dashboard
+    loadDashboard();
+    
+  } catch (err) {
+    showToast('Analysis failed');
+    document.getElementById('recording-status').textContent = 'Analysis failed';
+  }
+}
+
+async function viewRecordingHistory() {
+  try {
+    const res = await fetch(`${api}/voice/recordings`);
+    const recordings = await res.json();
+    if (!recordings.length) {
+      showToast('No saved recordings yet');
+      return;
+    }
+
+    const list = recordings.slice(0, 5).map(r => {
+      return `${new Date(r.created_at).toLocaleDateString()}: ${r.prompt_text || 'Practice'} • ${r.speaking_rate_wpm} WPM • ${Math.round(r.confidence_score*100)}% confidence`;
+    }).join('\n');
+
+    alert(`Recent recordings:\n\n${list}`);
+  } catch (err) {
+    showToast('Failed to load recording history');
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result || '';
+      resolve(dataUrl.toString().replace(/^data:audio\/[a-zA-Z0-9.+-]+;base64,/, ''));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// === PROGRESS INSIGHTS ===
+
+async function loadInsights() {
+  try {
+    const res = await fetch(`${api}/insights`);
+    const insights = await res.json();
+    
+    const container = document.getElementById('insights-list');
+    
+    if (insights.length === 0) {
+      container.innerHTML = '<div style="text-align: center; color: var(--text-3); padding: 40px;">No insights available yet. Start practicing to see your progress!</div>';
+      return;
+    }
+    
+    container.innerHTML = insights.map(insight => `
+      <div class="insight-card">
+        <div class="insight-title">${insight.title}</div>
+        <div class="insight-desc">${insight.description}</div>
+      </div>
+    `).join('');
+    
+  } catch (err) {
+    document.getElementById('insights-list').innerHTML = '<div style="text-align: center; color: var(--text-3); padding: 40px;">Failed to load insights</div>';
+  }
+}
+
+// === GROUP CHALLENGES ===
+
+async function loadChallenges() {
+  try {
+    // Get user's groups first
+    const groupsRes = await fetch(`${api}/groups`);
+    const groupsData = await groupsRes.json();
+    const groups = groupsData.groups || [];
+    
+    if (groups.length === 0) {
+      document.getElementById('challenges-list').innerHTML = '<div style="text-align: center; color: var(--text-3); padding: 40px;">Join a group to participate in challenges!</div>';
+      return;
+    }
+    
+    // Load challenges for first group (can be enhanced to show all)
+    const challengesRes = await fetch(`${api}/groups/${groups[0].id}/challenges`);
+    const challenges = await challengesRes.json();
+    
+    const container = document.getElementById('challenges-list');
+    
+    if (challenges.length === 0) {
+      container.innerHTML = '<div style="text-align: center; color: var(--text-3); padding: 40px;">No active challenges. Create one to get started!</div>';
+      return;
+    }
+    
+    container.innerHTML = challenges.map(challenge => `
+      <div class="challenge-card">
+        <div class="challenge-title">${challenge.title}</div>
+        <div class="challenge-meta">${challenge.description}</div>
+        <div class="challenge-meta">${challenge.participant_count} participants • ${challenge.my_progress || 0}/${challenge.target_value} ${challenge.target_metric}</div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${Math.min((challenge.my_progress || 0) / challenge.target_value * 100, 100)}%"></div>
+        </div>
+        ${!challenge.my_progress ? '<button class="btn-secondary" onclick="joinChallenge(\'' + challenge.id + '\')" style="margin-top: 12px;">Join Challenge</button>' : ''}
+      </div>
+    `).join('');
+    
+  } catch (err) {
+    document.getElementById('challenges-list').innerHTML = '<div style="text-align: center; color: var(--text-3); padding: 40px;">Failed to load challenges</div>';
+  }
+}
+
+async function joinChallenge(challengeId) {
+  try {
+    await fetch(`${api}/challenges/${challengeId}/join`, { method: 'POST' });
+    showToast('Joined challenge!');
+    loadChallenges();
+  } catch (err) {
+    showToast('Failed to join challenge');
+  }
+}
+
+async function createChallenge() {
+  try {
+    const groupsRes = await fetch(`${api}/groups`);
+    const groupsData = await groupsRes.json();
+    const groups = groupsData.groups || [];
+    const joinedGroups = groups.filter(g => g.is_member);
+    if (joinedGroups.length === 0) {
+      showToast('Join a group before creating a challenge');
+      return;
+    }
+
+    const title = prompt('Challenge title', 'Weekly speaking streak challenge');
+    if (!title) return;
+
+    const description = prompt('Challenge description', 'Complete the most practice sessions this week');
+    if (!description) return;
+
+    const targetMetric = prompt('Target metric (completion_rate, improvement, streak)', 'completion_rate');
+    const targetValue = Number(prompt('Target value', '5')) || 5;
+    const durationDays = Number(prompt('Duration in days', '7')) || 7;
+
+    const res = await fetch(`${api}/groups/${joinedGroups[0].id}/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description, targetMetric, targetValue, durationDays })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Unable to create challenge');
+
+    showToast('Challenge created!');
+    loadChallenges();
+  } catch (err) {
+    showToast(err.message || 'Failed to create challenge');
+  }
+}
+
 // === UTILITIES ===
 function showToast(msg) {
   const toast = document.createElement('div');
@@ -1804,2271 +2345,5 @@ function showToast(msg) {
 initApp();
 </script>
 
-</body>
-</html>
-  <!-- ONBOARDING SCREEN -->
-  <div id="onboarding-screen" style="
-    position: fixed; inset: 0; z-index: 10000;
-    background: #0d0d0d;
-    display: none; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 24px; text-align: center;
-  ">
-    <!-- Step 1: Welcome -->
-    <div id="ob-welcome" class="ob-step">
-      <div style="font-size:40px;font-weight:600;color:#d4ff4d;letter-spacing:-1px;margin-bottom:8px">
-        SpeakUp
-      </div>
-      <div style="font-size:15px;color:#888;margin-bottom:40px;max-width:320px;line-height:1.7">
-        Your 15-day elite speaking accelerator.<br>
-        Powered by AI. Runs fully on your machine.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px;margin-bottom:32px">
-        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
-          background:#141414;border:0.5px solid rgba(255,255,255,0.07);border-radius:10px">
-          <div style="width:36px;height:36px;background:rgba(212,255,77,0.1);border-radius:8px;
-            display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🎙</div>
-          <div style="text-align:left">
-            <div style="font-size:13px;font-weight:500;color:#f0ede8">Microphone access</div>
-            <div style="font-size:11px;color:#666">For live speech recording and transcription</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;
-          background:#141414;border:0.5px solid rgba(255,255,255,0.07);border-radius:10px">
-          <div style="width:36px;height:36px;background:rgba(212,255,77,0.1);border-radius:8px;
-            display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">📷</div>
-          <div style="text-align:left">
-            <div style="font-size:13px;font-weight:500;color:#f0ede8">Camera access</div>
-            <div style="font-size:11px;color:#666">For body language and posture analysis</div>
-          </div>
-        </div>
-      </div>
-      <button onclick="requestPermissions()" style="
-        background:#d4ff4d;color:#0d0d0d;font-weight:600;
-        border:none;border-radius:10px;padding:14px 32px;
-        font-size:15px;cursor:pointer;width:100%;max-width:320px;
-        font-family:inherit;
-      ">Allow access and start training</button>
-      <div style="font-size:11px;color:#555;margin-top:12px">
-        Your data never leaves your computer
-      </div>
-    </div>
-
-    <!-- Step 2: Permission denied recovery -->
-    <div id="ob-denied" class="ob-step" style="display:none">
-      <div style="width:56px;height:56px;background:rgba(255,68,68,0.1);border-radius:50%;
-        display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px">
-        ⚠
-      </div>
-      <div style="font-size:17px;font-weight:500;color:#f0ede8;margin-bottom:8px">
-        Permission blocked
-      </div>
-      <div style="font-size:13px;color:#888;max-width:300px;line-height:1.7;margin-bottom:24px">
-        SpeakUp needs your mic and camera to coach you. Here's how to enable them:
-      </div>
-      <div style="background:#141414;border:0.5px solid rgba(255,255,255,0.07);
-        border-radius:10px;padding:16px;text-align:left;width:100%;max-width:320px;margin-bottom:20px">
-        <div id="permission-steps" style="font-size:12px;color:#888;line-height:2">
-          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
-            <span style="color:#d4ff4d;font-weight:500;flex-shrink:0">1.</span>
-            Click the lock icon in your browser address bar
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
-            <span style="color:#d4ff4d;font-weight:500;flex-shrink:0">2.</span>
-            Find "Microphone" and "Camera" in the list
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
-            <span style="color:#d4ff4d;font-weight:500;flex-shrink:0">3.</span>
-            Change both from "Block" to "Allow"
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px">
-            <span style="color:#d4ff4d;font-weight:500;flex-shrink:0">4.</span>
-            Reload the page and click "Allow access" again
-          </div>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;width:100%;max-width:320px">
-        <button onclick="requestPermissions()" style="
-          flex:1;background:#d4ff4d;color:#0d0d0d;font-weight:600;
-          border:none;border-radius:10px;padding:12px;font-size:13px;
-          cursor:pointer;font-family:inherit
-        ">Try again</button>
-        <button onclick="continueVoiceOnly()" style="
-          flex:1;background:#141414;color:#888;
-          border:0.5px solid rgba(255,255,255,0.1);border-radius:10px;
-          padding:12px;font-size:13px;cursor:pointer;font-family:inherit
-        ">Voice only</button>
-      </div>
-      <div style="font-size:11px;color:#555;margin-top:12px">
-        Camera is optional — mic is required for voice features
-      </div>
-    </div>
-
-    <!-- Step 3: Success state -->
-    <div id="ob-success" class="ob-step" style="display:none">
-      <div style="width:56px;height:56px;background:rgba(77,255,170,0.1);border-radius:50%;
-        display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px">
-        ✓
-      </div>
-      <div style="font-size:17px;font-weight:500;color:#4dffaa;margin-bottom:8px">
-        You're all set
-      </div>
-      <div style="font-size:13px;color:#888;margin-bottom:24px">
-        Mic and camera ready. Starting your training...
-      </div>
-      <div style="width:200px;height:2px;background:rgba(255,255,255,0.06);border-radius:1px;overflow:hidden">
-        <div id="ob-progress-bar" style="height:100%;background:#d4ff4d;width:0%;transition:width 1.5s ease"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PROFILE SETUP SCREEN -->
-  <div id="profile-setup-screen" style="
-    position: fixed; inset: 0; z-index: 9500;
-    background: #0d0d0d;
-    display: none;
-    flex-direction: column; align-items: center; justify-content: center;
-    padding: 24px; overflow-y: auto;
-  ">
-    <div style="width:100%;max-width:400px">
-
-      <div style="margin-bottom:32px;text-align:center">
-        <div style="font-size:13px;color:#d4ff4d;font-weight:500;
-          text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">
-          Day 1 of 15
-        </div>
-        <div style="font-size:26px;font-weight:600;color:#f0ede8;letter-spacing:-0.5px">
-          Let's set up your profile
-        </div>
-        <div style="font-size:13px;color:#666;margin-top:6px">
-          This takes 30 seconds. Stored only on your machine.
-        </div>
-      </div>
-
-      <!-- Name -->
-      <div style="margin-bottom:16px">
-        <label style="display:block;font-size:11px;color:#666;
-          text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-          Your name
-        </label>
-        <input id="setup-name" type="text" placeholder="Atharva"
-          style="width:100%;background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-            border-radius:10px;padding:12px 14px;color:#f0ede8;font-size:14px;
-            font-family:inherit;outline:none"
-          onfocus="this.style.borderColor='rgba(212,255,77,0.4)'"
-          onblur="this.style.borderColor='rgba(255,255,255,0.1)'"
-        />
-      </div>
-
-      <!-- Speaking goal -->
-      <div style="margin-bottom:16px">
-        <label style="display:block;font-size:11px;color:#666;
-          text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-          What's your #1 speaking goal?
-        </label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <button class="goal-btn" data-goal="Job interviews & career"
-            onclick="selectGoal(this)"
-            style="background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-              border-radius:10px;padding:12px;color:#888;font-size:12px;
-              cursor:pointer;font-family:inherit;text-align:left;line-height:1.4">
-            Job interviews<br>& career
-          </button>
-          <button class="goal-btn" data-goal="Public speaking & presentations"
-            onclick="selectGoal(this)"
-            style="background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-              border-radius:10px;padding:12px;color:#888;font-size:12px;
-              cursor:pointer;font-family:inherit;text-align:left;line-height:1.4">
-            Public speaking<br>& presentations
-          </button>
-          <button class="goal-btn" data-goal="Leadership & team communication"
-            onclick="selectGoal(this)"
-            style="background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-              border-radius:10px;padding:12px;color:#888;font-size:12px;
-              cursor:pointer;font-family:inherit;text-align:left;line-height:1.4">
-            Leadership &<br>team comms
-          </button>
-          <button class="goal-btn" data-goal="Confidence in daily conversations"
-            onclick="selectGoal(this)"
-            style="background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-              border-radius:10px;padding:12px;color:#888;font-size:12px;
-              cursor:pointer;font-family:inherit;text-align:left;line-height:1.4">
-            Daily confidence<br>& conversations
-          </button>
-        </div>
-      </div>
-
-      <!-- Native language -->
-      <div style="margin-bottom:16px">
-        <label style="display:block;font-size:11px;color:#666;
-          text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-          Your native language
-        </label>
-        <select id="setup-language"
-          style="width:100%;background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-            border-radius:10px;padding:12px 14px;color:#f0ede8;font-size:14px;
-            font-family:inherit;outline:none;appearance:none;cursor:pointer">
-          <option value="">Select language...</option>
-          <option value="Hindi">Hindi</option>
-          <option value="Marathi">Marathi</option>
-          <option value="Tamil">Tamil</option>
-          <option value="Telugu">Telugu</option>
-          <option value="Bengali">Bengali</option>
-          <option value="Gujarati">Gujarati</option>
-          <option value="Kannada">Kannada</option>
-          <option value="Malayalam">Malayalam</option>
-          <option value="Punjabi">Punjabi</option>
-          <option value="English">English (native)</option>
-          <option value="Mandarin">Mandarin</option>
-          <option value="Spanish">Spanish</option>
-          <option value="Arabic">Arabic</option>
-          <option value="Portuguese">Portuguese</option>
-          <option value="French">French</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-
-      <!-- Speaking context -->
-      <div style="margin-bottom:28px">
-        <label style="display:block;font-size:11px;color:#666;
-          text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-          Where do you speak most?
-        </label>
-        <div style="display:flex;gap:8px">
-          <button class="context-btn" data-ctx="formal"
-            onclick="selectContext(this)"
-            style="flex:1;background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-              border-radius:10px;padding:10px;color:#888;font-size:12px;
-              cursor:pointer;font-family:inherit">
-            Formal only
-          </button>
-          <button class="context-btn" data-ctx="casual"
-            onclick="selectContext(this)"
-            style="flex:1;background:#141414;border:0.5px solid rgba(255,255,255,0.1);
-              border-radius:10px;padding:10px;color:#888;font-size:12px;
-              cursor:pointer;font-family:inherit">
-            Casual only
-          </button>
-          <button class="context-btn" data-ctx="both"
-            onclick="selectContext(this)"
-            style="flex:1;background:rgba(212,255,77,0.1);
-              border:0.5px solid rgba(212,255,77,0.3);
-              border-radius:10px;padding:10px;color:#d4ff4d;font-size:12px;
-              cursor:pointer;font-family:inherit">
-            Both
-          </button>
-        </div>
-      </div>
-
-      <!-- Submit -->
-      <button onclick="submitProfile(event)"
-        style="width:100%;background:#d4ff4d;color:#0d0d0d;font-weight:600;
-          border:none;border-radius:10px;padding:14px;font-size:15px;
-          cursor:pointer;font-family:inherit;letter-spacing:-0.2px">
-        Start my 15-day journey
-      </button>
-
-      <div style="font-size:11px;color:#444;margin-top:12px;text-align:center">
-        Your data is stored in speakup.db on this computer only.<br>
-        <span onclick="document.getElementById('data-info').style.display='block'"
-          style="color:#666;cursor:pointer;text-decoration:underline">
-          What exactly gets saved?
-        </span>
-      </div>
-
-      <div id="data-info" style="display:none;margin-top:12px;background:#141414;
-        border:0.5px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px;
-        font-size:12px;color:#666;line-height:1.8">
-        Name · goal · language · daily scores · speech transcripts ·<br>
-        filler word counts · journal entries · camera alert logs.<br><br>
-        <strong style="color:#888">Nothing is sent anywhere</strong> — except your speech
-        transcript which goes to Gemini API for AI coaching feedback.<br><br>
-        Your database: <code style="color:#d4ff4d;font-size:11px">data/speakup.db</code><br>
-        Backup JSON: <code style="color:#d4ff4d;font-size:11px">data/progress.json</code>
-      </div>
-    </div>
-  </div>
-
-  <!-- STICKY HEADER -->
-  <div class="header">
-    <div class="header-left">SpeakUp</div>
-    <div class="header-center" id="dayBadge">Day 1 of 15</div>
-    <div class="header-right">
-      <div class="streak-dot"></div>
-      <span id="streakBadge">0 day streak</span>
-      <div id="profile-btn" onclick="toggleProfilePanel()"
-        style="width:32px;height:32px;border-radius:50%;
-          background:rgba(212,255,77,0.1);border:0.5px solid rgba(212,255,77,0.2);
-          display:flex;align-items:center;justify-content:center;
-          font-size:13px;font-weight:600;color:#d4ff4d;cursor:pointer;
-          user-select:none;margin-left:12px" id="profile-avatar">
-        A
-      </div>
-    </div>
-  </div>
-
-  <div class="progress-bar">
-    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-  </div>
-
-  <!-- HABIT STEPPER -->
-  <div class="habit-stepper" id="habitStepper">
-    <!-- Populated by JS -->
-  </div>
-
-  <!-- HABIT CARDS -->
-  <div id="habitContainer">
-    <!-- Habit cards inserted here -->
-  </div>
-
-  <!-- PROGRESS SECTION -->
-  <div class="habit-card">
-    <div style="font-size: 14px; font-weight: 500; margin-bottom: 16px;">Progress Calendar</div>
-    <div class="progress-calendar" id="progressCalendar">
-      <!-- Calendar cells -->
-    </div>
-
-    <div style="font-size: 14px; font-weight: 500; margin-bottom: 16px; margin-top: 24px;">Score Trend</div>
-    <div class="score-chart">
-      <canvas id="scoreChart"></canvas>
-      <div class="chart-legend">
-        <div class="legend-item">
-          <div class="legend-color" style="background: var(--accent)"></div>
-          <span>Overall</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color" style="background: var(--success)"></div>
-          <span>Structure</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color" style="background: #4d9fff"></div>
-          <span>Confidence</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color" style="background: var(--warning)"></div>
-          <span>Pacing</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-color" style="background: #ff7755"></div>
-          <span>Body</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PROFILE SLIDE PANEL -->
-  <div id="profile-panel" style="
-    position: fixed; top: 0; right: -320px; width: 300px; height: 100vh;
-    background: #141414; border-left: 0.5px solid rgba(255,255,255,0.07);
-    z-index: 8000; transition: right 0.3s ease;
-    overflow-y: auto; padding: 20px;
-  ">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
-      <span style="font-size:14px;font-weight:500;color:#f0ede8">Your Profile</span>
-      <button onclick="toggleProfilePanel()"
-        style="background:none;border:none;color:#666;font-size:18px;cursor:pointer">✕</button>
-    </div>
-
-    <!-- Avatar + name -->
-    <div style="text-align:center;margin-bottom:24px">
-      <div style="width:64px;height:64px;border-radius:50%;
-        background:rgba(212,255,77,0.1);border:1.5px solid rgba(212,255,77,0.3);
-        display:flex;align-items:center;justify-content:center;
-        font-size:24px;font-weight:600;color:#d4ff4d;margin:0 auto 12px"
-        id="panel-avatar">A</div>
-      <div id="panel-name" style="font-size:17px;font-weight:500;color:#f0ede8"></div>
-      <div id="panel-goal" style="font-size:12px;color:#666;margin-top:3px"></div>
-    </div>
-
-    <!-- Stats -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
-      <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-        <div id="panel-day" style="font-size:20px;font-weight:500;color:#d4ff4d;
-          font-family:monospace">1</div>
-        <div style="font-size:10px;color:#555;margin-top:2px">current day</div>
-      </div>
-      <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-        <div id="panel-streak" style="font-size:20px;font-weight:500;color:#ff6b35;
-          font-family:monospace">0</div>
-        <div style="font-size:10px;color:#555;margin-top:2px">day streak</div>
-      </div>
-      <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-        <div id="panel-best" style="font-size:20px;font-weight:500;color:#4dffaa;
-          font-family:monospace">—</div>
-        <div style="font-size:10px;color:#555;margin-top:2px">best score</div>
-      </div>
-      <div style="background:#1a1a1a;border-radius:10px;padding:12px;text-align:center">
-        <div id="panel-fillers" style="font-size:20px;font-weight:500;color:#ffaa33;
-          font-family:monospace">—</div>
-        <div style="font-size:10px;color:#555;margin-top:2px">best filler rate</div>
-      </div>
-    </div>
-
-    <!-- Profile details -->
-    <div style="background:#1a1a1a;border-radius:10px;padding:14px;margin-bottom:16px">
-      <div style="font-size:10px;color:#555;text-transform:uppercase;
-        letter-spacing:.05em;margin-bottom:10px">Profile</div>
-      <div style="display:flex;justify-content:space-between;
-        padding:6px 0;border-bottom:0.5px solid rgba(255,255,255,0.05)">
-        <span style="font-size:12px;color:#666">Native language</span>
-        <span id="panel-lang" style="font-size:12px;color:#888"></span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:6px 0">
-        <span style="font-size:12px;color:#666">Speaking context</span>
-        <span id="panel-ctx" style="font-size:12px;color:#888"></span>
-      </div>
-    </div>
-
-    <!-- Top filler words -->
-    <div style="background:#1a1a1a;border-radius:10px;padding:14px;margin-bottom:16px">
-      <div style="font-size:10px;color:#555;text-transform:uppercase;
-        letter-spacing:.05em;margin-bottom:10px">Your top offenders</div>
-      <div id="panel-fillers-list" style="font-size:12px;color:#666">
-        Complete a session to see filler trends
-      </div>
-    </div>
-
-    <!-- Data + privacy -->
-    <div style="background:#1a1a1a;border-radius:10px;padding:14px;margin-bottom:16px">
-      <div style="font-size:10px;color:#555;text-transform:uppercase;
-        letter-spacing:.05em;margin-bottom:10px">Your data</div>
-      <div style="font-size:11px;color:#555;line-height:1.7;margin-bottom:10px">
-        Stored locally at <code style="color:#d4ff4d">data/speakup.db</code><br>
-        Backup JSON auto-saved after every session.<br>
-        Transcripts sent to Gemini API for AI feedback only.
-      </div>
-      <div style="display:flex;gap:8px">
-        <a href="/api/export" style="flex:1;background:#0d0d0d;border:0.5px solid rgba(255,255,255,0.1);
-          border-radius:8px;padding:8px;text-align:center;font-size:11px;
-          color:#888;text-decoration:none;cursor:pointer">
-          Export data
-        </a>
-        <button onclick="confirmReset()"
-          style="flex:1;background:#0d0d0d;border:0.5px solid rgba(255,68,68,0.2);
-            border-radius:8px;padding:8px;font-size:11px;color:#ff4444;
-            cursor:pointer;font-family:inherit">
-          Reset all data
-        </button>
-      </div>
-    </div>
-
-    <!-- Start date -->
-    <div style="font-size:11px;color:#444;text-align:center">
-      Training started: <span id="panel-start-date"></span>
-    </div>
-  </div>
-
-  <!-- Overlay behind panel -->
-  <div id="profile-overlay" onclick="toggleProfilePanel()"
-    style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:7999"></div>
-
-  <script>
-    // Global state
-    let progress = { currentDay: 1, streak: 0, sessions: [] };
-    let habits = [
-      { id: 'warmup', name: 'Warm-up', duration: '10 min', status: 'not-started' },
-      { id: 'twisters', name: 'Twisters', duration: '10 min', status: 'locked' },
-      { id: 'article', name: 'Article', duration: '30 min', status: 'locked' },
-      { id: 'shadow', name: 'Shadow', duration: '20 min', status: 'locked' },
-      { id: 'task', name: 'Task', duration: '30 min', status: 'locked' },
-      { id: 'mirror', name: 'Mirror', duration: '15 min', status: 'locked' },
-      { id: 'journal', name: 'Journal', duration: '5 min', status: 'locked' }
-    ];
-
-    let recording = false;
-    let transcript = '';
-    let mediaRecorder;
-    let recordedChunks = [];
-    let voiceRecognition;
-    let startTime;
-    let scoreChart;
-
-    // Initialize
-    // DOMContentLoaded moved to end of script
-
-    async function checkExistingPermissions() {
-      // For testing: directly call initApp to show profile setup
-      initApp();
-    }
-
-    // Render habit stepper
-    function renderStepper() {
-      const stepper = document.getElementById('habitStepper');
-      stepper.innerHTML = '';
-
-      const labels = ['Warm-up', 'Twisters', 'Article', 'Shadow', 'Task', 'Mirror', 'Journal'];
-
-      habits.forEach((habit, index) => {
-        const step = document.createElement('div');
-        step.className = 'habit-step';
-
-        const circle = document.createElement('div');
-        circle.className = `habit-circle ${habit.status}`;
-        if (habit.status === 'in-progress') circle.classList.add('active');
-        circle.textContent = index + 1;
-
-        const label = document.createElement('div');
-        label.className = `habit-label ${habit.status === 'in-progress' ? 'active' : ''}`;
-        label.textContent = labels[index];
-
-        if (index < habits.length - 1) {
-          const connector = document.createElement('div');
-          connector.className = 'habit-connector';
-          step.appendChild(connector);
-        }
-
-        step.appendChild(circle);
-        step.appendChild(label);
-        stepper.appendChild(step);
-      });
-    }
-
-    // Render habit cards
-    function renderHabitCard(habit) {
-      const card = document.createElement('div');
-      card.className = 'habit-card';
-      card.id = `habit-${habit.id}`;
-
-      let content = '';
-
-      switch (habit.id) {
-        case 'warmup':
-          content = `
-            <div class="habit-header">
-              <div>
-                <div class="habit-title">1. Breathing & Warm-up</div>
-                <div class="habit-badges">
-                  <div class="badge ${habit.status}">${habit.status.replace('-', ' ')}</div>
-                  <div class="badge">${habit.duration}</div>
-                </div>
-              </div>
-            </div>
-            <div class="breathing-container">
-              <div class="breathing-circle">
-                <div class="breathing-fill" id="breathingFill"></div>
-                <div class="breathing-phase" id="breathingPhase">Inhale 4</div>
-                <div class="breathing-countdown mono" id="breathingCountdown">4</div>
-              </div>
-              <div class="phase-dots">
-                <div class="phase-dot active" id="phase1"></div>
-                <div class="phase-dot" id="phase2"></div>
-                <div class="phase-dot" id="phase3"></div>
-                <div class="phase-dot" id="phase4"></div>
-              </div>
-              <div class="breathing-timer" id="breathingTimer">8:20 remaining</div>
-              <button class="btn-primary" id="startWarmupBtn">Start Warm-up</button>
-            </div>
-          `;
-          break;
-
-        case 'twisters':
-          content = `
-            <div class="habit-header">
-              <div>
-                <div class="habit-title">2. Tongue Twisters</div>
-                <div class="habit-badges">
-                  <div class="badge ${habit.status}">${habit.status.replace('-', ' ')}</div>
-                  <div class="badge">${habit.duration}</div>
-                </div>
-              </div>
-            </div>
-            <div class="twister-text" id="twisterText">Loading twisters...</div>
-            <div class="twister-meta">
-              <div class="badge">Difficulty: Beginner</div>
-              <div class="badge">Phoneme: R/L</div>
-            </div>
-            <div class="target-wpm">Target: 130 WPM</div>
-            <div class="speed-buttons">
-              <button class="speed-btn active" data-speed="slow">Slow (91)</button>
-              <button class="speed-btn" data-speed="normal">Normal (130)</button>
-              <button class="speed-btn" data-speed="fast">Fast (169)</button>
-            </div>
-            <div class="record-section">
-              <button class="record-btn" id="recordTwisterBtn">●</button>
-              <div class="live-metrics">
-                <div class="metric-item">
-                  <div class="metric-value" id="liveWPM">0</div>
-                  <div class="metric-label">WPM</div>
-                  <div class="metric-sub" id="wpmAccuracy">0% accuracy</div>
-                </div>
-                <div class="metric-item">
-                  <div class="metric-value" id="liveFillers">0</div>
-                  <div class="metric-label">FILLERS</div>
-                  <div class="metric-sub">this round</div>
-                </div>
-              </div>
-            </div>
-            <div class="transcript-box" id="twisterTranscript">Your speech will appear here</div>
-          `;
-          break;
-
-        case 'article':
-          content = `
-            <div class="habit-header">
-              <div>
-                <div class="habit-title">3. Read & Analyze Article</div>
-                <div class="habit-badges">
-                  <div class="badge ${habit.status}">${habit.status.replace('-', ' ')}</div>
-                  <div class="badge">${habit.duration}</div>
-                </div>
-              </div>
-            </div>
-            <div class="article-container">
-              <div class="article-title" id="articleTitle">Loading article...</div>
-              <div class="article-meta">
-                <div class="badge">Source: TechCrunch</div>
-                <div class="badge">5 min read</div>
-              </div>
-              <div class="article-content" id="articleContent">Loading article content...</div>
-            </div>
-            <div class="questions-section">
-              <div class="question-item">
-                <div class="question-label">QUESTION 1</div>
-                <div class="question-text">What is the main idea of this article?</div>
-                <input type="text" class="question-input" placeholder="Your answer...">
-              </div>
-              <div class="question-item">
-                <div class="question-label">QUESTION 2</div>
-                <div class="question-text">What surprised you most about this topic?</div>
-                <input type="text" class="question-input" placeholder="Your answer...">
-              </div>
-              <div class="question-item">
-                <div class="question-label">QUESTION 3</div>
-                <div class="question-text">How does this relate to your own experience?</div>
-                <input type="text" class="question-input" placeholder="Your answer...">
-              </div>
-            </div>
-            <button class="btn-primary" id="readArticleBtn">Read Aloud</button>
-            <div class="transcript-box" id="articleTranscript" style="margin-top: 16px;">Your reading will appear here</div>
-          `;
-          break;
-
-        case 'shadow':
-          content = `
-            <div class="habit-header">
-              <div>
-                <div class="habit-title">4. Shadow a Speaker</div>
-                <div class="habit-badges">
-                  <div class="badge ${habit.status}">${habit.status.replace('-', ' ')}</div>
-                  <div class="badge">${habit.duration}</div>
-                </div>
-              </div>
-            </div>
-            <div class="shadow-excerpt" id="shadowExcerpt">Loading excerpt...</div>
-            <div class="shadow-meta">
-              <div class="badge">Speaker: Elon Musk</div>
-              <div class="badge">Context: Product Launch</div>
-              <div class="badge">Target: 150 WPM</div>
-            </div>
-            <div class="action-buttons">
-              <button class="btn-ghost" id="listenShadowBtn">Listen first</button>
-              <button class="btn-primary" id="shadowRecordBtn">Your turn</button>
-            </div>
-            <div class="record-section">
-              <div class="live-metrics">
-                <div class="metric-item">
-                  <div class="metric-value" id="shadowWPM">0</div>
-                  <div class="metric-label">YOUR WPM</div>
-                  <div class="metric-sub">Target: 150</div>
-                </div>
-                <div class="metric-item">
-                  <div class="metric-value" id="shadowAccuracy">0%</div>
-                  <div class="metric-label">WORD MATCH</div>
-                  <div class="metric-sub">accuracy</div>
-                </div>
-                <div class="metric-item">
-                  <div class="metric-value" id="shadowPauses">0/6</div>
-                  <div class="metric-label">PAUSES HIT</div>
-                  <div class="metric-sub">marked |</div>
-                </div>
-              </div>
-            </div>
-            <div class="transcript-box" id="shadowTranscript">Your speech will appear here</div>
-          `;
-          break;
-
-        case 'task':
-          content = `
-            <div class="habit-header">
-              <div>
-                <div class="habit-title">5. Main Task Recording</div>
-                <div class="habit-badges">
-                  <div class="badge ${habit.status}">${habit.status.replace('-', ' ')}</div>
-                  <div class="badge">${habit.duration}</div>
-                </div>
-              </div>
-            </div>
-            <div class="recording-layout">
-              <div class="transcript-section">
-                <div class="record-controls">
-                  <button class="main-record-btn" id="mainRecordBtn">●</button>
-                  <div class="waveform" id="mainWaveform" style="display: none;">
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                    <div class="waveform-bar"></div>
-                  </div>
-                </div>
-                <div class="transcript-box" id="mainTranscript">Your speech will appear here</div>
-              </div>
-              <div class="sidebar-section">
-                <div class="sidebar-metrics">
-                  <div class="metric-card">
-                    <div class="metric-label">Fillers</div>
-                    <div class="metric-value mono" id="sidebarFillers">0</div>
-                    <div class="metric-sub">per minute</div>
-                    <div class="metric-bar">
-                      <div class="metric-fill" id="fillersBar"></div>
-                    </div>
-                  </div>
-                  <div class="metric-card">
-                    <div class="metric-label">WPM</div>
-                    <div class="metric-value mono" id="sidebarWPM">0</div>
-                    <div class="metric-sub">words/min</div>
-                    <div class="metric-bar">
-                      <div class="metric-fill" id="wpmBar"></div>
-                    </div>
-                  </div>
-                  <div class="metric-card">
-                    <div class="metric-label">Confidence</div>
-                    <div class="metric-value mono" id="sidebarConfidence">0</div>
-                    <div class="metric-sub">weak phrases</div>
-                    <div class="metric-bar">
-                      <div class="metric-fill" id="confidenceBar"></div>
-                    </div>
-                  </div>
-                  <div class="metric-card">
-                    <div class="metric-label">Time</div>
-                    <div class="metric-value mono" id="sidebarTime">0:00</div>
-                    <div class="metric-sub">/ 2:00</div>
-                    <div class="metric-bar">
-                      <div class="metric-fill" id="timeBar"></div>
-                    </div>
-                  </div>
-                </div>
-                <div class="video-preview" style="position: relative;">
-                  <video id="previewVideo" muted autoplay playsinline></video>
-                  <div class="live-badge" id="liveBadge" style="display: none;">
-                    <div class="live-dot"></div>
-                    LIVE
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-          break;
-
-        case 'mirror':
-          content = `
-            <div class="habit-header">
-              <div>
-                <div class="habit-title">6. Mirror Practice</div>
-                <div class="habit-badges">
-                  <div class="badge ${habit.status}">${habit.status.replace('-', ' ')}</div>
-                  <div class="badge">${habit.duration}</div>
-                </div>
-              </div>
-            </div>
-            <video class="mirror-video" id="mirrorVideo" controls></video>
-            <div class="checklist">
-              <div class="checklist-item" data-item="1">
-                <div class="custom-checkbox" id="check1"></div>
-                <div class="checklist-text">Made eye contact</div>
-              </div>
-              <div class="checklist-item" data-item="2">
-                <div class="custom-checkbox" id="check2"></div>
-                <div class="checklist-text">Smiled at least once</div>
-              </div>
-              <div class="checklist-item" data-item="3">
-                <div class="custom-checkbox" id="check3"></div>
-                <div class="checklist-text">Hands visible and open</div>
-              </div>
-              <div class="checklist-item" data-item="4">
-                <div class="custom-checkbox" id="check4"></div>
-                <div class="checklist-text">Avoided touching face</div>
-              </div>
-              <div class="checklist-item" data-item="5">
-                <div class="custom-checkbox" id="check5"></div>
-                <div class="checklist-text">Posture stayed upright</div>
-              </div>
-              <div class="checklist-item" data-item="6">
-                <div class="custom-checkbox" id="check6"></div>
-                <div class="checklist-text">Spoke without looking down</div>
-              </div>
-            </div>
-            <div class="score-display">
-              <div class="score-number mono" id="mirrorScore">0</div>
-              <div style="font-size: 12px; color: var(--text-3);">/ 6 completed</div>
-            </div>
-            <div class="fix-note">
-              <div class="fix-label">One thing to fix tomorrow:</div>
-              <input type="text" class="fix-input" id="mirrorNote" placeholder="e.g., stop looking down">
-            </div>
-            <button class="btn-primary" id="saveMirrorBtn">Save & Continue</button>
-          `;
-          break;
-
-        case 'journal':
-          content = `
-            <div class="habit-header">
-              <div>
-                <div class="habit-title">7. Daily AI Journal</div>
-                <div class="habit-badges">
-                  <div class="badge ${habit.status}">${habit.status.replace('-', ' ')}</div>
-                  <div class="badge">${habit.duration}</div>
-                </div>
-              </div>
-            </div>
-            <div class="journal-generate" id="generateJournal">
-              <div style="font-size: 16px; margin-bottom: 8px;">Generate journal entry</div>
-              <div style="font-size: 12px; color: var(--text-3);">AI-powered reflection on your day</div>
-            </div>
-            <div class="journal-entry" id="journalEntry" style="display: none;">
-              <div class="journal-line">
-                <div class="journal-label">Win</div>
-                <div class="journal-text" id="journalWin">Loading...</div>
-              </div>
-              <div class="journal-divider"></div>
-              <div class="journal-line">
-                <div class="journal-label gap">Gap</div>
-                <div class="journal-text" id="journalGap">Loading...</div>
-              </div>
-              <div class="journal-divider"></div>
-              <div class="journal-line">
-                <div class="journal-label tomorrow">Tomorrow</div>
-                <div class="journal-text" id="journalTomorrow">Loading...</div>
-              </div>
-            </div>
-            <button class="btn-primary" id="saveJournalBtn" style="display: none;">Save to journal</button>
-          `;
-          break;
-      }
-
-      card.innerHTML = content;
-      return card;
-    }
-
-    // Update habit container
-    function updateHabitContainer() {
-      const container = document.getElementById('habitContainer');
-      container.innerHTML = '';
-
-      habits.forEach(habit => {
-        if (habit.status !== 'locked') {
-          container.appendChild(renderHabitCard(habit));
-        }
-      });
-
-      attachEventListeners();
-    }
-
-    // Attach event listeners
-    function attachEventListeners() {
-      // Warmup
-      const startWarmupBtn = document.getElementById('startWarmupBtn');
-      if (startWarmupBtn) {
-        startWarmupBtn.addEventListener('click', startWarmup);
-      }
-
-      // Twisters
-      const recordTwisterBtn = document.getElementById('recordTwisterBtn');
-      if (recordTwisterBtn) {
-        recordTwisterBtn.addEventListener('click', () => toggleRecording('twister'));
-      }
-
-      // Article
-      const readArticleBtn = document.getElementById('readArticleBtn');
-      if (readArticleBtn) {
-        readArticleBtn.addEventListener('click', () => toggleRecording('article'));
-      }
-
-      // Shadow
-      const listenShadowBtn = document.getElementById('listenShadowBtn');
-      if (listenShadowBtn) {
-        listenShadowBtn.addEventListener('click', listenToShadow);
-      }
-      const shadowRecordBtn = document.getElementById('shadowRecordBtn');
-      if (shadowRecordBtn) {
-        shadowRecordBtn.addEventListener('click', () => toggleRecording('shadow'));
-      }
-
-      // Task
-      const mainRecordBtn = document.getElementById('mainRecordBtn');
-      if (mainRecordBtn) {
-        mainRecordBtn.addEventListener('click', () => toggleRecording('task'));
-      }
-
-      // Mirror
-      const saveMirrorBtn = document.getElementById('saveMirrorBtn');
-      if (saveMirrorBtn) {
-        saveMirrorBtn.addEventListener('click', saveMirror);
-      }
-
-      // Journal
-      const generateJournal = document.getElementById('generateJournal');
-      if (generateJournal) {
-        generateJournal.addEventListener('click', generateJournalEntry);
-      }
-      const saveJournalBtn = document.getElementById('saveJournalBtn');
-      if (saveJournalBtn) {
-        saveJournalBtn.addEventListener('click', saveJournal);
-      }
-
-      // Checklist items
-      for (let i = 1; i <= 6; i++) {
-        const checkItem = document.querySelector(`[data-item="${i}"]`);
-        if (checkItem) {
-          checkItem.addEventListener('click', () => toggleChecklistItem(i));
-        }
-      }
-
-      // Speed buttons
-      const speedBtns = document.querySelectorAll('.speed-btn');
-      speedBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          speedBtns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-        });
-      });
-    }
-
-    // Breathing warm-up
-    async function startWarmup() {
-      const phases = [
-        { text: 'Inhale 4', duration: 4000, fill: 'inhale' },
-        { text: 'Hold 4', duration: 4000, fill: 'hold' },
-        { text: 'Exhale 4', duration: 4000, fill: 'exhale' },
-        { text: 'Hold 4', duration: 4000, fill: 'hold' }
-      ];
-
-      const circle = document.getElementById('breathingCircle');
-      const fill = document.getElementById('breathingFill');
-      const phaseEl = document.getElementById('breathingPhase');
-      const countdownEl = document.getElementById('breathingCountdown');
-      const btn = document.getElementById('startWarmupBtn');
-
-      btn.disabled = true;
-      btn.textContent = 'In Progress...';
-
-      for (let i = 0; i < phases.length; i++) {
-        const phase = phases[i];
-        phaseEl.textContent = phase.text;
-
-        // Update phase dots
-        document.querySelectorAll('.phase-dot').forEach((dot, idx) => {
-          dot.classList.toggle('active', idx <= i);
-        });
-
-        // Animate fill
-        if (phase.fill === 'inhale') {
-          fill.classList.remove('exhale');
-          fill.classList.add('inhale');
-        } else if (phase.fill === 'exhale') {
-          fill.classList.remove('inhale');
-          fill.classList.add('exhale');
-        }
-
-        // Countdown
-        for (let t = Math.floor(phase.duration / 1000); t > 0; t--) {
-          countdownEl.textContent = t;
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
-      // Jaw rolls, hum, lip trill
-      const finalPhases = [
-        { text: 'Jaw Rolls', duration: 30000 },
-        { text: 'Hum & Sigh', duration: 30000 },
-        { text: 'Lip Trill', duration: 20000 }
-      ];
-
-      for (const phase of finalPhases) {
-        phaseEl.textContent = phase.text;
-        countdownEl.textContent = Math.floor(phase.duration / 1000);
-        await new Promise(resolve => setTimeout(resolve, phase.duration));
-      }
-
-      phaseEl.textContent = 'Done!';
-      countdownEl.textContent = '✓';
-      btn.textContent = 'Complete';
-      btn.disabled = false;
-
-      markHabitComplete('warmup');
-    }
-
-    // Recording functions
-    function toggleRecording(type) {
-      if (recording) {
-        stopRecording();
-      } else {
-        startRecording(type);
-      }
-    }
-
-    async function startRecording(type) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'task' });
-        recording = true;
-        startTime = Date.now();
-        transcript = '';
-        recordedChunks = [];
-
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-          if (type === 'mirror') {
-            const video = document.getElementById('mirrorVideo');
-            video.src = URL.createObjectURL(blob);
-          }
-        };
-        mediaRecorder.start();
-
-        // Video preview for main task
-        if (type === 'task') {
-          const video = document.getElementById('previewVideo');
-          video.srcObject = stream;
-          document.getElementById('liveBadge').style.display = 'flex';
-          document.getElementById('mainWaveform').style.display = 'flex';
-          document.getElementById('mainRecordBtn').classList.add('recording');
-        }
-
-        // Speech recognition
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          voiceRecognition = new SpeechRecognition();
-          voiceRecognition.continuous = true;
-          voiceRecognition.interimResults = true;
-          voiceRecognition.onresult = (event) => {
-            let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
-              }
-            }
-            if (finalTranscript) {
-              transcript += finalTranscript + ' ';
-              updateTranscriptDisplay(type);
-            }
-          };
-          voiceRecognition.start();
-        }
-
-        updateRecordingUI(type, true);
-      } catch (error) {
-        console.error('Recording error:', error);
-        alert('Microphone access denied. Please allow microphone permissions.');
-      }
-    }
-
-    function stopRecording() {
-      recording = false;
-
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
-
-      if (voiceRecognition) {
-        voiceRecognition.stop();
-      }
-
-      // Stop video streams
-      if (document.getElementById('previewVideo').srcObject) {
-        document.getElementById('previewVideo').srcObject.getTracks().forEach(track => track.stop());
-        document.getElementById('liveBadge').style.display = 'none';
-        document.getElementById('mainWaveform').style.display = 'none';
-        document.getElementById('mainRecordBtn').classList.remove('recording');
-      }
-
-      updateRecordingUI('', false);
-      analyzeSpeech();
-    }
-
-    function updateRecordingUI(type, isRecording) {
-      const btns = document.querySelectorAll('[id$="RecordBtn"], [id$="Btn"]');
-      btns.forEach(btn => {
-        if (btn.id.includes('Record') || btn.id.includes('readArticle') || btn.id.includes('shadowRecord') || btn.id.includes('mainRecord')) {
-          if (isRecording) {
-            btn.textContent = '■';
-            btn.classList.add('recording');
-          } else {
-            btn.textContent = btn.id.includes('readArticle') ? 'Read Aloud' : btn.id.includes('mainRecord') ? '●' : 'Record';
-            btn.classList.remove('recording');
-          }
-        }
-      });
-    }
-
-    function updateTranscriptDisplay(type) {
-      const element = document.getElementById(`${type}Transcript`);
-      if (element) {
-        element.innerHTML = highlightFillers(transcript);
-      }
-    }
-
-    function highlightFillers(text) {
-      const fillerWords = ['um', 'uh', 'like', 'you know', 'basically', 'literally', 'actually', 'right', 'so', 'kind of', 'sort of', 'i mean', 'hmm', 'okay so'];
-      const regex = new RegExp(`\\b(${fillerWords.join('|')})\\b`, 'gi');
-      return text.replace(regex, '<span class="filler">$1</span>');
-    }
-
-    // Analysis
-    async function analyzeSpeech() {
-      if (!transcript || transcript.split(/\s+/).filter(Boolean).length < 20) {
-        alert('Speak more! Need at least 20 words for analysis.');
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/feedback/full', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            transcript,
-            day: progress.currentDay,
-            duration: Math.round((Date.now() - startTime) / 1000),
-            inputMethod: 'voice'
-          })
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          alert(data.error || 'Analysis failed.');
-          return;
-        }
-
-        renderAnalysis(data);
-      } catch (error) {
-        alert('Ollama not running. Start Ollama: run `ollama serve` in terminal.');
-      }
-    }
-
-    function renderAnalysis(data) {
-      // Create analysis section
-      const analysisSection = document.createElement('div');
-      analysisSection.className = 'habit-card';
-      analysisSection.innerHTML = `
-        <div style="text-align: center; margin-bottom: 24px;">
-          <div style="font-size: 56px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: var(--accent); margin-bottom: 8px;" id="overallScore">0</div>
-          <div style="font-size: 20px; color: var(--text-3);">/ 10</div>
-          <div style="font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em;">overall score</div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;">
-          <div class="metric-card">
-            <div class="metric-label">Structure</div>
-            <div class="metric-value mono" id="structureScore">0</div>
-            <div class="metric-bar"><div class="metric-fill" id="structureBar"></div></div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Confidence</div>
-            <div class="metric-value mono" id="confidenceScore">0</div>
-            <div class="metric-bar"><div class="metric-fill" id="confidenceBar"></div></div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Pacing</div>
-            <div class="metric-value mono" id="pacingScore">0</div>
-            <div class="metric-bar"><div class="metric-fill" id="pacingBar"></div></div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Emotion</div>
-            <div class="metric-value mono" id="emotionScore">0</div>
-            <div class="metric-bar"><div class="metric-fill" id="emotionBar"></div></div>
-          </div>
-        </div>
-
-        <div class="metric-card" style="margin-bottom: 24px;">
-          <div class="metric-label">Body Language</div>
-          <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
-              <div style="width: 6px; height: 6px; background: var(--success); border-radius: 50%;"></div>
-              Posture: 8
-            </div>
-            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
-              <div style="width: 6px; height: 6px; background: var(--warning); border-radius: 50%;"></div>
-              Eye contact: 6
-            </div>
-            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
-              <div style="width: 6px; height: 6px; background: var(--accent); border-radius: 50%;"></div>
-              Gestures: 7
-            </div>
-            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
-              <div style="width: 6px; height: 6px; background: var(--success); border-radius: 50%;"></div>
-              Expression: 8
-            </div>
-            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
-              <div style="width: 6px; height: 6px; background: var(--warning); border-radius: 50%;"></div>
-              Head: 5
-            </div>
-            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
-              <div style="width: 6px; height: 6px; background: var(--accent); border-radius: 50%;"></div>
-              Energy: 7
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 24px;">
-          <div style="font-size: 14px; font-weight: 500; margin-bottom: 12px;">Tomorrow's drill</div>
-          <div style="background: var(--accent-bg); border: 0.5px solid var(--accent-border); border-radius: var(--radius-lg); padding: 16px 20px;">
-            <div style="font-size: 10px; color: var(--text-3); text-transform: uppercase; margin-bottom: 8px;">AI-generated</div>
-            <div style="font-size: 13px; font-weight: 500; color: var(--accent);" id="tomorrowDrill">Practice pausing after questions for 2 seconds</div>
-          </div>
-        </div>
-
-        <div style="text-align: center;">
-          <div style="font-size: 13px; color: var(--accent); font-weight: 500; margin-bottom: 16px;">How did that feel?</div>
-          <div style="display: flex; gap: 8px; justify-content: center;">
-            <button class="btn-ghost">Much better</button>
-            <button class="btn-ghost">About the same</button>
-            <button class="btn-ghost">Harder than expected</button>
-          </div>
-        </div>
-      `;
-
-      document.getElementById('habitContainer').appendChild(analysisSection);
-
-      // Animate scores
-      animateScore('overallScore', data.overallScore || 7);
-      animateScore('structureScore', data.structureScore || 8);
-      animateScore('confidenceScore', data.confidenceScore || 6);
-      animateScore('pacingScore', data.pacingScore || 7);
-      animateScore('emotionScore', data.emotionScore || 8);
-
-      // Animate bars
-      setTimeout(() => {
-        document.getElementById('structureBar').style.width = `${(data.structureScore || 8) * 10}%`;
-        document.getElementById('confidenceBar').style.width = `${(data.confidenceScore || 6) * 10}%`;
-        document.getElementById('pacingBar').style.width = `${(data.pacingScore || 7) * 10}%`;
-        document.getElementById('emotionBar').style.width = `${(data.emotionScore || 8) * 10}%`;
-      }, 500);
-    }
-
-    function animateScore(elementId, targetScore) {
-      const element = document.getElementById(elementId);
-      let current = 0;
-      const increment = targetScore / 30;
-      const timer = setInterval(() => {
-        current += increment;
-        if (current >= targetScore) {
-          current = targetScore;
-          clearInterval(timer);
-        }
-        element.textContent = Math.round(current);
-      }, 50);
-    }
-
-    // Habit completion
-    function markHabitComplete(habitId) {
-      const habit = habits.find(h => h.id === habitId);
-      if (habit) {
-        habit.status = 'done';
-        const nextIndex = habits.indexOf(habit) + 1;
-        if (nextIndex < habits.length) {
-          habits[nextIndex].status = 'in-progress';
-        }
-        renderStepper();
-        updateHabitContainer();
-        saveProgress();
-      }
-    }
-
-    // Mirror functions
-    function toggleChecklistItem(itemNumber) {
-      const checkbox = document.getElementById(`check${itemNumber}`);
-      const item = checkbox.parentElement;
-      const isChecked = checkbox.classList.contains('checked');
-
-      if (isChecked) {
-        checkbox.classList.remove('checked');
-        item.classList.remove('checked');
-      } else {
-        checkbox.classList.add('checked');
-        item.classList.add('checked');
-      }
-
-      updateMirrorScore();
-    }
-
-    function updateMirrorScore() {
-      const checkedCount = document.querySelectorAll('.custom-checkbox.checked').length;
-      document.getElementById('mirrorScore').textContent = checkedCount;
-    }
-
-    function saveMirror() {
-      const note = document.getElementById('mirrorNote').value;
-      if (!note.trim()) {
-        alert('Please enter one thing to fix tomorrow.');
-        return;
-      }
-      markHabitComplete('mirror');
-    }
-
-    // Journal functions
-    async function generateJournalEntry() {
-      const generateBtn = document.getElementById('generateJournal');
-      const entryDiv = document.getElementById('journalEntry');
-      const saveBtn = document.getElementById('saveJournalBtn');
-
-      generateBtn.classList.add('loading');
-      generateBtn.innerHTML = '<div style="font-size: 16px;">Thinking...</div><div style="font-size: 12px; color: var(--text-3);">Generating your journal entry</div>';
-
-      try {
-        const response = await fetch('/api/journal/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ day: progress.currentDay })
-        });
-
-        const data = await response.json();
-
-        document.getElementById('journalWin').textContent = data.win || 'You completed all 7 daily habits!';
-        document.getElementById('journalGap').textContent = data.gap || 'Keep working on filler word reduction.';
-        document.getElementById('journalTomorrow').textContent = data.tomorrow || 'Focus on maintaining eye contact.';
-
-        generateBtn.style.display = 'none';
-        entryDiv.style.display = 'block';
-        saveBtn.style.display = 'block';
-
-      } catch (error) {
-        alert('Journal generation failed. Ollama may not be running.');
-        generateBtn.classList.remove('loading');
-        generateBtn.innerHTML = '<div style="font-size: 16px; margin-bottom: 8px;">Generate journal entry</div><div style="font-size: 12px; color: var(--text-3);">AI-powered reflection on your day</div>';
-      }
-    }
-
-    function saveJournal() {
-      markHabitComplete('journal');
-    }
-
-    // Placeholder functions
-    function listenToShadow() {
-      alert('Listen feature not implemented yet.');
-    }
-
-    // Progress management
-    async function loadProgress() {
-      try {
-        const response = await fetch('/api/progress');
-        if (response.ok) {
-          progress = await response.json();
-          updateUI();
-        }
-      } catch (error) {
-        console.error('Failed to load progress:', error);
-      }
-    }
-
-    async function saveProgress() {
-      try {
-        await fetch('/api/progress', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(progress)
-        });
-      } catch (error) {
-        console.error('Failed to save progress:', error);
-      }
-    }
-
-    function updateUI() {
-      document.getElementById('dayBadge').textContent = `Day ${progress.currentDay} of 15`;
-      document.getElementById('streakBadge').textContent = `${progress.streak} day streak`;
-      document.getElementById('progressFill').style.width = `${(progress.currentDay / 15) * 100}%`;
-
-      // Update calendar
-      const calendar = document.getElementById('progressCalendar');
-      calendar.innerHTML = '';
-      for (let i = 1; i <= 15; i++) {
-        const cell = document.createElement('div');
-        cell.className = `calendar-cell ${i < progress.currentDay ? 'done' : i === progress.currentDay ? 'today' : 'locked'}`;
-        cell.innerHTML = `<div>${i}</div>${i < progress.currentDay ? '<div class="calendar-score">8.2</div>' : ''}`;
-        calendar.appendChild(cell);
-      }
-
-      // Update chart
-      const scores = progress.sessions.map(s => s.overallScore || 0).concat(Array(15 - progress.sessions.length).fill(0));
-      if (scoreChart) scoreChart.destroy();
-
-      const ctx = document.getElementById('scoreChart').getContext('2d');
-      scoreChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: Array.from({ length: 15 }, (_, i) => i + 1),
-          datasets: [{
-            label: 'Overall',
-            data: scores,
-            borderColor: 'var(--accent)',
-            backgroundColor: 'rgba(212,255,77,0.1)',
-            tension: 0.4,
-            fill: false,
-            pointRadius: 3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: { beginAtZero: true, max: 10, grid: { color: 'rgba(255,255,255,0.07)' } },
-            x: { grid: { color: 'rgba(255,255,255,0.07)' } }
-          },
-          plugins: { legend: { display: false } }
-        }
-      });
-    }
-
-    const curriculum = [
-      { day: 1, title: "Get started with confidence", goal: "Introduce yourself clearly", task: "Introduce yourself in 60 seconds. Use a strong opening sentence, state your name, background, and speaking goal.", targetDuration: 60, difficulty: "beginner", evaluationCriteria: "clarity, confidence, opening strength" },
-      { day: 2, title: "Slow down and breathe", goal: "Master pacing", task: "Explain your favorite hobby to someone who knows nothing about it. Speak slowly. Pause between sentences. Target: 110 WPM. No rushing.", targetDuration: 90, difficulty: "beginner", evaluationCriteria: "pacing, WPM, clarity, pauses" },
-      { day: 3, title: "Story time", goal: "Master narrative structure", task: "Tell a 2-minute personal story with a clear beginning (set the scene), middle (conflict or challenge), and end (resolution or lesson learned).", targetDuration: 120, difficulty: "beginner", evaluationCriteria: "story structure, transitions, engagement, clarity" },
-      { day: 4, title: "The rule of three", goal: "Use structured arguments", task: "Pick any topic you care about. Give exactly 3 reasons you love or believe in it. Use transition phrases between each point: 'First...', 'Second...', 'Finally...'", targetDuration: 120, difficulty: "beginner", evaluationCriteria: "structure, transitions, argument quality, confidence" },
-      { day: 5, title: "Both sides now", goal: "Think on your feet", task: "Choose a controversial but safe topic (e.g., remote work vs office). Argue FOR it for 90 seconds. Then argue AGAINST it for 90 seconds. Commit fully to each side.", targetDuration: 180, difficulty: "intermediate", evaluationCriteria: "argument strength, transitions, commitment, vocabulary" },
-      { day: 6, title: "The strong hook", goal: "Open with impact", task: "Prepare 4 different openings for the same 1-minute speech on 'why learning new skills matters'. Each opening must be different: question / shocking stat / story / bold statement.", targetDuration: 240, difficulty: "intermediate", evaluationCriteria: "hook strength, variety, energy, engagement" },
-      { day: 7, title: "Confidence boot camp", goal: "Eliminate weak language", task: "Speak for 2 minutes about any topic you know well. BANNED words: think, maybe, sort of, kind of, I guess, I hope, perhaps, probably. Every sentence must be declarative and direct.", targetDuration: 120, difficulty: "intermediate", evaluationCriteria: "confidence signals, banned word count, directness, authority" },
-      { day: 8, title: "Explain like I'm five", goal: "Simplify complex ideas", task: "Pick a complex topic from your field (tech, science, business). Explain it in under 2 minutes to a 10-year-old. No jargon. Use analogies. Make them understand.", targetDuration: 120, difficulty: "intermediate", evaluationCriteria: "simplicity, analogy quality, clarity, engagement" },
-      { day: 9, title: "Impromptu round", goal: "Speak without preparation", task: "The app will give you a random topic. You have 10 seconds to think. Then speak for 90 seconds. No stopping. No preparing ahead. Pure spontaneous speech.", targetDuration: 90, difficulty: "intermediate", evaluationCriteria: "structure under pressure, filler rate, confidence, completion" },
-      { day: 10, title: "The persuader", goal: "Master persuasive speaking", task: "Convince an imaginary skeptical audience to adopt one specific habit (reading, exercise, meditation — your choice). Use evidence, emotion, and a clear call to action.", targetDuration: 180, difficulty: "advanced", evaluationCriteria: "persuasion techniques, emotion, evidence quality, call to action" },
-      { day: 11, title: "Q&A simulation", goal: "Handle tough questions", task: "Give a 90-second overview of any project or idea. Then the app will show you 3 tough follow-up questions (generated by AI). Answer each in 30-45 seconds. Stay calm.", targetDuration: 210, difficulty: "advanced", evaluationCriteria: "composure, answer quality, listening, conciseness" },
-      { day: 12, title: "The contrast speech", goal: "Use rhetorical devices", task: "Write and deliver a 2-minute speech using at least 3 rhetorical devices: contrast (before vs after), repetition (repeat a key phrase 3 times), and metaphor (compare your idea to something vivid).", targetDuration: 120, difficulty: "advanced", evaluationCriteria: "rhetorical devices used, memorability, language quality, delivery" },
-      { day: 13, title: "The 2-minute pitch", goal: "Pitch anything perfectly", task: "Pitch any idea, product, or project you care about in exactly 2 minutes. Must include: what it is, who it's for, why it matters, and what you want from the listener.", targetDuration: 120, difficulty: "advanced", evaluationCriteria: "pitch structure, clarity, confidence, call to action" },
-      { day: 14, title: "TED-style talk", goal: "Deliver a mini TED talk", task: "Prepare and deliver a 3-minute talk on 'one idea worth spreading' from your own life or learning. Must have a memorable opening, one story, one surprising insight, and a strong close.", targetDuration: 180, difficulty: "advanced", evaluationCriteria: "all dimensions: structure, story, insight, delivery, memorability" },
-      { day: 15, title: "The final assessment", goal: "Show how far you've come", task: "Repeat Day 1's task exactly: introduce yourself for 60 seconds. Then give a 2-minute speech on what you learned about yourself in 15 days. Compare to Day 1 recording.", targetDuration: 180, difficulty: "advanced", evaluationCriteria: "compare to Day 1: filler reduction, confidence gain, structure, WPM control" }
-    ];
-
-    function setStatus(message, type = 'info') {
-      const banner = document.getElementById('statusBanner');
-      banner.textContent = message;
-      banner.className = `status-banner ${type === 'error' ? 'error' : ''}`;
-      banner.classList.remove('hidden');
-      setTimeout(() => banner.classList.add('hidden'), 5000);
-    }
-
-    function getScoreColor(score) {
-      if (score < 4) return 'var(--danger)';
-      if (score < 6) return 'var(--warning)';
-      if (score < 8) return 'var(--accent)';
-      return 'var(--success)';
-    }
-
-    function animateScore(target) {
-      const node = document.getElementById('overallScore');
-      let current = 0;
-      const step = Math.max(1, Math.round(target / 30));
-      const interval = setInterval(() => {
-        current = Math.min(current + step, target);
-        node.textContent = current;
-        if (current >= target) clearInterval(interval);
-      }, 50);
-    }
-
-    function renderCategoryCard(title, score, summary, detail) {
-      const card = document.createElement('div');
-      card.className = 'feedback-card';
-      card.innerHTML = `
-        <div class="feedback-header">
-          <div><div style="font-weight:700;">${title}</div><div class="caption">Score: ${score}/10</div></div>
-          <div style="min-width:80px;"><div class="progress-bar"><div class="progress-fill" style="width:${score*10}%; background:${getScoreColor(score)}"></div></div></div>
-        </div>
-        <div style="margin-top:12px;">${summary}</div>
-        <div class="feedback-details"><pre style="white-space:pre-wrap;">${detail}</pre></div>
-      `;
-      card.addEventListener('click', () => card.classList.toggle('expanded'));
-      return card;
-    }
-
-    // TOAST NOTIFICATIONS
-    function showToast(message, type = 'info') {
-      const toast = document.createElement('div');
-      toast.className = `toast toast-${type}`;
-      toast.textContent = message;
-      document.body.appendChild(toast);
-
-      setTimeout(() => {
-        toast.classList.add('show');
-        setTimeout(() => {
-          toast.classList.remove('show');
-          setTimeout(() => document.body.removeChild(toast), 300);
-        }, 3000);
-      }, 100);
-    }
-
-    // STEPPER NAVIGATION
-    function navigateToHabit(index) {
-      const habit = habits[index];
-      if (habit.status === 'locked') {
-        showToast('Complete previous habits first!', 'error');
-        return;
-      }
-
-      // Update current habit index
-      currentHabitIndex = index;
-
-      // Update stepper visual state
-      renderStepper();
-
-      // Update habit container
-      updateHabitContainer();
-
-      // Show navigation toast
-      showToast(`Switched to ${habit.name}`, 'success');
-    }
-
-    function renderStepper() {
-      const stepper = document.getElementById('habitStepper');
-      stepper.innerHTML = '';
-      habits.forEach((habit, index) => {
-        const circle = document.createElement('div');
-        circle.className = `habit-circle ${habit.status}`;
-        if (habit.status === 'in-progress') circle.classList.add('active');
-        circle.setAttribute('data-number', index + 1);
-        circle.innerHTML = `<div style="font-size: 18px; font-weight: 600;">${index + 1}</div>`;
-        circle.onclick = () => navigateToHabit(index);
-        const label = document.createElement('div');
-        label.className = 'habit-label';
-        label.textContent = habit.name;
-        circle.appendChild(label);
-        stepper.appendChild(circle);
-      });
-    }
-
-    function renderHabitCard(habit) {
-      const card = document.createElement('div');
-      card.className = 'habit-card';
-      card.id = `habit-${habit.id}`;
-      card.innerHTML = `
-        <div class="habit-header">
-          <div>
-            <div class="habit-title">${habit.name}</div>
-            <div class="habit-duration">${habit.duration}</div>
-          </div>
-          <div class="habit-status ${habit.status}">${habit.status.replace('-', ' ')}</div>
-        </div>
-        <div id="habit-content-${habit.id}">
-          ${getHabitContent(habit)}
-        </div>
-      `;
-      return card;
-    }
-
-    function getHabitContent(habit) {
-      switch (habit.id) {
-        case 'warmup':
-          return `
-            <div style="text-align: center;">
-              <div class="breathing-circle" id="breathingCircle">Inhale 4</div>
-              <div style="margin-top: 20px;">
-                <button class="button-primary" id="startWarmupBtn">Start Warm-up</button>
-              </div>
-            </div>
-          `;
-        case 'twisters':
-          return `
-            <div id="twisterContent">
-              <div style="text-align: center; margin-bottom: 20px;">
-                <div style="font-size: 24px; margin-bottom: 10px;" id="twisterText">Loading twisters...</div>
-                <div class="caption" id="twisterInfo">Difficulty: Beginner</div>
-              </div>
-              <div style="display: flex; justify-content: center; gap: 12px;">
-                <button class="button-primary" id="recordTwisterBtn">Record</button>
-                <button class="button-secondary" id="nextTwisterBtn" disabled>Next</button>
-              </div>
-              <div class="transcript-box" id="twisterTranscript" style="margin-top: 20px;">Your speech will appear here</div>
-            </div>
-          `;
-        case 'article':
-          return `
-            <div id="articleContent">
-              <div style="margin-bottom: 20px;">
-                <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;" id="articleTitle">Loading article...</div>
-                <div class="caption" id="articleMeta">Source: Loading</div>
-              </div>
-              <div style="margin-bottom: 20px;">
-                <div id="articleText">Loading article content...</div>
-              </div>
-              <div style="text-align: center;">
-                <button class="button-primary" id="readArticleBtn">Read Aloud</button>
-              </div>
-              <div class="transcript-box" id="articleTranscript" style="margin-top: 20px;">Your reading will appear here</div>
-            </div>
-          `;
-        case 'shadow':
-          return `
-            <div id="shadowContent">
-              <div style="margin-bottom: 20px;">
-                <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;" id="shadowSpeaker">Loading speaker...</div>
-                <div class="caption" id="shadowContext">Context: Loading</div>
-              </div>
-              <div style="margin-bottom: 20px;">
-                <div id="shadowText">Loading excerpt...</div>
-              </div>
-              <div style="display: flex; justify-content: center; gap: 12px;">
-                <button class="button-secondary" id="listenShadowBtn">Listen First</button>
-                <button class="button-primary" id="shadowRecordBtn">Your Turn</button>
-              </div>
-              <div class="transcript-box" id="shadowTranscript" style="margin-top: 20px;">Your speech will appear here</div>
-            </div>
-          `;
-        case 'task':
-          return `
-            <div id="taskContent">
-              <div style="margin-bottom: 20px;">
-                <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;" id="taskTitle">Loading task...</div>
-                <div class="caption" id="taskGoal">Goal: Loading</div>
-              </div>
-              <div style="margin-bottom: 20px;">
-                <div id="taskDescription">Loading task description...</div>
-              </div>
-              <div style="text-align: center;">
-                <button class="button-primary" id="recordTaskBtn">Record Task</button>
-              </div>
-              <div class="transcript-box" id="taskTranscript" style="margin-top: 20px;">Your speech will appear here</div>
-            </div>
-          `;
-        case 'mirror':
-          return `
-            <div id="mirrorContent">
-              <div style="margin-bottom: 20px;">
-                <video id="mirrorVideo" controls style="width: 100%; border-radius: 8px;"></video>
-              </div>
-              <div style="margin-bottom: 20px;">
-                <div style="font-weight: 600; margin-bottom: 12px;">Review your performance:</div>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-                  <label><input type="checkbox" id="mirror1"> Made eye contact</label>
-                  <label><input type="checkbox" id="mirror2"> Smiled at least once</label>
-                  <label><input type="checkbox" id="mirror3"> Hands visible and open</label>
-                  <label><input type="checkbox" id="mirror4"> Avoided touching face</label>
-                  <label><input type="checkbox" id="mirror5"> Posture stayed upright</label>
-                  <label><input type="checkbox" id="mirror6"> Spoke without looking down</label>
-                </div>
-              </div>
-              <div style="margin-bottom: 20px;">
-                <div style="font-weight: 600; margin-bottom: 8px;">One thing to fix tomorrow:</div>
-                <input type="text" class="textarea" id="mirrorNote" placeholder="e.g., stop looking down">
-              </div>
-              <div style="text-align: center;">
-                <button class="button-primary" id="saveMirrorBtn">Save & Continue</button>
-              </div>
-            </div>
-          `;
-        case 'log':
-          return `
-            <div id="logContent">
-              <div style="margin-bottom: 20px;">
-                <div style="font-weight: 600; margin-bottom: 12px;">Your daily journal entry:</div>
-                <div id="journalEntry" style="background: var(--bg-surface); padding: 16px; border-radius: 8px; min-height: 120px;">Generating journal entry...</div>
-              </div>
-              <div style="text-align: center;">
-                <button class="button-primary" id="saveJournalBtn">Save Journal</button>
-              </div>
-            </div>
-          `;
-        default:
-          return '<div>Habit content not available</div>';
-      }
-    }
-
-    function updateHabitContainer() {
-      const container = document.getElementById('habitContainer');
-      container.innerHTML = '';
-      habits.forEach(habit => {
-        if (habit.status !== 'locked') {
-          container.appendChild(renderHabitCard(habit));
-        }
-      });
-      attachHabitEventListeners();
-    }
-
-    function attachHabitEventListeners() {
-      // Warmup
-      const startWarmupBtn = document.getElementById('startWarmupBtn');
-      if (startWarmupBtn) {
-        startWarmupBtn.addEventListener('click', startWarmup);
-      }
-
-      // Twisters
-      const recordTwisterBtn = document.getElementById('recordTwisterBtn');
-      if (recordTwisterBtn) {
-        recordTwisterBtn.addEventListener('click', () => toggleRecording('twister'));
-      }
-
-      // Article
-      const readArticleBtn = document.getElementById('readArticleBtn');
-      if (readArticleBtn) {
-        readArticleBtn.addEventListener('click', () => toggleRecording('article'));
-      }
-
-      // Shadow
-      const listenShadowBtn = document.getElementById('listenShadowBtn');
-      if (listenShadowBtn) {
-        listenShadowBtn.addEventListener('click', listenToShadow);
-      }
-      const shadowRecordBtn = document.getElementById('shadowRecordBtn');
-      if (shadowRecordBtn) {
-        shadowRecordBtn.addEventListener('click', () => toggleRecording('shadow'));
-      }
-
-      // Task
-      const recordTaskBtn = document.getElementById('recordTaskBtn');
-      if (recordTaskBtn) {
-        recordTaskBtn.addEventListener('click', () => toggleRecording('task'));
-      }
-
-      // Mirror
-      const saveMirrorBtn = document.getElementById('saveMirrorBtn');
-      if (saveMirrorBtn) {
-        saveMirrorBtn.addEventListener('click', saveMirror);
-      }
-
-      // Journal
-      const saveJournalBtn = document.getElementById('saveJournalBtn');
-      if (saveJournalBtn) {
-        saveJournalBtn.addEventListener('click', saveJournal);
-      }
-    }
-
-    async function startWarmup() {
-      const phases = [
-        { text: 'Inhale 4', duration: 4000 },
-        { text: 'Hold 4', duration: 4000 },
-        { text: 'Exhale 4', duration: 4000 },
-        { text: 'Hold 4', duration: 4000 },
-        { text: 'Jaw Rolls', duration: 30000 },
-        { text: 'Hum & Sigh', duration: 30000 },
-        { text: 'Lip Trill', duration: 20000 }
-      ];
-
-      const circle = document.getElementById('breathingCircle');
-      const btn = document.getElementById('startWarmupBtn');
-      btn.disabled = true;
-      btn.textContent = 'In Progress...';
-
-      for (const phase of phases) {
-        circle.textContent = phase.text;
-        await new Promise(resolve => setTimeout(resolve, phase.duration));
-      }
-
-      circle.textContent = 'Done!';
-      btn.textContent = 'Complete';
-      btn.disabled = false;
-      markHabitComplete('warmup');
-    }
-
-    function toggleRecording(type) {
-      if (recording) {
-        stopRecording();
-      } else {
-        startRecording(type);
-      }
-    }
-
-    function startRecording(type) {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setStatus('Microphone not supported in this browser. Use Chrome or Edge.', 'error');
-        return;
-      }
-
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-          recording = true;
-          startTime = Date.now();
-          transcript = '';
-          recordedChunks = [];
-
-          mediaRecorder = new MediaRecorder(stream);
-          mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
-          mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-            // Handle blob if needed
-          };
-          mediaRecorder.start();
-
-          if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            voiceRecognition = new SpeechRecognition();
-            voiceRecognition.continuous = true;
-            voiceRecognition.interimResults = true;
-            voiceRecognition.onresult = (event) => {
-              let finalTranscript = '';
-              for (let i = event.resultIndex; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                  finalTranscript += event.results[i][0].transcript;
-                }
-              }
-              if (finalTranscript) {
-                transcript += finalTranscript + ' ';
-                updateTranscriptDisplay(type);
-              }
-            };
-            voiceRecognition.start();
-          }
-
-          updateRecordingUI(type, true);
-        })
-        .catch(err => {
-          console.error('Error accessing microphone:', err);
-          setStatus('Microphone access denied. Please allow microphone permissions.', 'error');
-        });
-    }
-
-    function stopRecording() {
-      recording = false;
-      duration = Math.round((Date.now() - startTime) / 1000);
-
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
-
-      if (voiceRecognition) {
-        voiceRecognition.stop();
-      }
-
-      updateRecordingUI('', false);
-      analyzeSpeech();
-    }
-
-    function updateRecordingUI(type, isRecording) {
-      const btns = document.querySelectorAll('[id$="RecordBtn"], [id$="Btn"]');
-      btns.forEach(btn => {
-        if (btn.id.includes('Record') || btn.id.includes('readArticle') || btn.id.includes('shadowRecord')) {
-          btn.textContent = isRecording ? 'Stop Recording' : (btn.id.includes('readArticle') ? 'Read Aloud' : 'Record');
-          btn.className = isRecording ? 'button-secondary' : 'button-primary';
-        }
-      });
-
-      if (isRecording) {
-        const waveform = document.createElement('div');
-        waveform.className = 'waveform';
-        for (let i = 0; i < 5; i++) {
-          const bar = document.createElement('div');
-          bar.className = 'waveform-bar';
-          waveform.appendChild(bar);
-        }
-        document.getElementById(`${type}Content`).appendChild(waveform);
-      } else {
-        const waveforms = document.querySelectorAll('.waveform');
-        waveforms.forEach(w => w.remove());
-      }
-    }
-
-    function updateTranscriptDisplay(type) {
-      const element = document.getElementById(`${type}Transcript`);
-      if (element) {
-        element.innerHTML = highlightFillers(transcript);
-      }
-    }
-
-    function highlightFillers(text) {
-      const regex = new RegExp(`\\b(${fillerWords.join('|')})\\b`, 'gi');
-      return text.replace(regex, '<span class="filler">$1</span>');
-    }
-
-    async function analyzeSpeech() {
-      if (!transcript || transcript.split(/\s+/).filter(Boolean).length < 20) {
-        setStatus('Speak more! Need at least 20 words for analysis.');
-        return;
-      }
-
-      setStatus('Analyzing your speech...');
-      document.getElementById('analysisSection').classList.remove('hidden');
-
-      const payload = { transcript, day: progress.currentDay, duration: duration || 60, inputMethod: 'voice' };
-      try {
-        const response = await fetch('/api/feedback/full', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          setStatus(data.error || 'Analysis failed.');
-          return;
-        }
-        renderAnalysis(data);
-      } catch (error) {
-        setStatus('Ollama not running. Start Ollama: run `ollama serve` in terminal.');
-      }
-    }
-
-    function renderAnalysis(data) {
-      const section = document.getElementById('analysisSection');
-      const score = data.overallScore || 0;
-      document.getElementById('overallScore').textContent = '0';
-      document.getElementById('overallLabel').textContent = score < 4 ? 'Needs practice' : score < 6 ? 'Keep improving' : score < 8 ? 'Strong' : 'Excellent';
-      document.getElementById('overallCard').style.borderColor = getScoreColor(score);
-      animateScore(score);
-
-      const grid = document.getElementById('categoryGrid');
-      grid.innerHTML = '';
-
-      const fillerSummary = `Total fillers: ${data.fillerAnalysis.totalFillers}. Rate: ${data.fillerAnalysis.fillerRate}/min. Grade: ${data.fillerAnalysis.grade}.`;
-      const fillerDetails = JSON.stringify(data.fillerAnalysis.byWord, null, 2);
-      grid.appendChild(renderCategoryCard('Filler Words', data.fillerAnalysis.grade === 'A' ? 10 : data.fillerAnalysis.grade === 'B' ? 8 : data.fillerAnalysis.grade === 'C' ? 6 : data.fillerAnalysis.grade === 'D' ? 4 : 2, fillerSummary, fillerDetails));
-
-      const structureSummary = `Hook ${data.structureAnalysis.hookScore}, flow ${data.structureAnalysis.flowScore}, clarity ${data.structureAnalysis.clarityScore}, close ${data.structureAnalysis.closingScore}.`;
-      const structureDetails = data.structureAnalysis.suggestions.join('\n');
-      grid.appendChild(renderCategoryCard('Structure & Clarity', data.structureAnalysis.overallStructure, structureSummary, structureDetails));
-
-      const confidenceSummary = `Confidence ${data.toneAnalysis.confidenceScore}. Weak: ${data.toneAnalysis.weakPhrases.join(', ') || 'none'}.`;
-      const confidenceDetails = `Strong: ${data.toneAnalysis.strongPhrases.join(', ')}\nRewrite suggestions:\n${data.toneAnalysis.rewriteSuggestions.map(item => `• ${item.original} → ${item.improved}`).join('\n')}`;
-      grid.appendChild(renderCategoryCard('Tone & Confidence', data.toneAnalysis.confidenceScore, confidenceSummary, confidenceDetails));
-
-      const pronunSummary = `Clarity ${data.pronunciationGuide.overallClarity}. Flagged words: ${data.pronunciationGuide.flaggedWords.map(w => w.word).join(', ') || 'none'}.`;
-      const pronunDetails = data.pronunciationGuide.flaggedWords.map(w => `${w.word}: ${w.phonetic} — ${w.tip}`).join('\n');
-      grid.appendChild(renderCategoryCard('Pronunciation', data.pronunciationGuide.overallClarity, pronunSummary, pronunDetails));
-
-      document.getElementById('improvedVersion').textContent = data.improvedVersion || 'No improved version generated.';
-      document.getElementById('todaysDrill').textContent = data.todaysDrill || 'No drill available.';
-      setStatus('Analysis complete.');
-    }
-
-    function markHabitComplete(habitId) {
-      const habit = habits.find(h => h.id === habitId);
-      if (habit) {
-        habit.status = 'done';
-        const nextIndex = habits.indexOf(habit) + 1;
-        if (nextIndex < habits.length) {
-          habits[nextIndex].status = 'in-progress';
-        }
-        renderStepper();
-        updateHabitContainer();
-      }
-    }
-
-    async function loadProgress() {
-      try {
-        const response = await fetch('/api/progress');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.needsSetup) {
-            return;
-          }
-          progress = data;
-          updateUI();
-        }
-      } catch (error) {
-        console.error('Failed to load progress:', error);
-      }
-    }
-
-    function updateUI() {
-      const currentDay = progress.currentDay || 1;
-      const streakValue = progress.streak != null ? progress.streak : 0;
-      const dayData = curriculum[currentDay - 1] || curriculum[0];
-
-      const streakEl = document.getElementById('streakBadge');
-      if (streakEl) streakEl.textContent = `${streakValue} day streak`;
-
-      const dayBadge = document.getElementById('dayBadge');
-      if (dayBadge) dayBadge.textContent = `Day ${dayData.day} of 15`;
-
-      const progressFill = document.getElementById('progressFill');
-      if (progressFill) progressFill.style.width = `${(currentDay / 15) * 100}%`;
-
-      const calendar = document.getElementById('progressCalendar');
-      if (calendar) {
-        calendar.innerHTML = '';
-        for (let i = 1; i <= 15; i += 1) {
-          const cell = document.createElement('div');
-          cell.className = 'calendar-cell';
-          if (i < currentDay) cell.classList.add('done');
-          if (i === currentDay) cell.classList.add('today');
-          cell.textContent = i;
-          calendar.appendChild(cell);
-        }
-      }
-
-      const scores = (progress.sessions || []).map(s => s.overallScore || 0);
-      if (scoreChart) scoreChart.destroy();
-      const ctx = document.getElementById('scoreChart')?.getContext('2d');
-      if (ctx) {
-        scoreChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: Array.from({ length: 15 }, (_, i) => i + 1),
-            datasets: [{
-              label: 'Score',
-              data: scores,
-              borderColor: 'var(--accent)',
-              backgroundColor: 'rgba(255,107,53,0.2)',
-              tension: 0.3,
-              fill: true
-            }]
-          },
-          options: {
-            responsive: true,
-            scales: { y: { beginAtZero: true, max: 10 } }
-          }
-        });
-      }
-    }
-
-    // Placeholder functions for incomplete habits
-    function listenToShadow() { setStatus('Listen feature not implemented yet.'); }
-    function saveMirror() { markHabitComplete('mirror'); }
-    function saveJournal() { markHabitComplete('log'); }
-
-    // ONBOARDING FUNCTIONS
-    async function requestPermissions() {
-      const onboarding = document.getElementById('onboarding-screen');
-      const welcomeStep = document.getElementById('ob-welcome');
-      const deniedStep = document.getElementById('ob-denied');
-      const successStep = document.getElementById('ob-success');
-
-      welcomeStep.style.display = 'none';
-      deniedStep.style.display = 'none';
-      successStep.style.display = 'block';
-
-      try {
-        // Request microphone
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStream.getTracks().forEach(track => track.stop());
-
-        // Request camera
-        const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        camStream.getTracks().forEach(track => track.stop());
-
-        // Success animation
-        const progressBar = document.getElementById('ob-progress-bar');
-        progressBar.style.width = '100%';
-
-        setTimeout(() => {
-          onboarding.style.display = 'none';
-          localStorage.setItem('speakup-onboarded', 'true');
-          initApp(); // Call initApp after onboarding
-        }, 1500);
-
-      } catch (error) {
-        console.log('Permission denied:', error);
-        successStep.style.display = 'none';
-        deniedStep.style.display = 'block';
-      }
-    }
-
-    function continueVoiceOnly() {
-      const onboarding = document.getElementById('onboarding-screen');
-      onboarding.style.display = 'none';
-      localStorage.setItem('speakup-onboarded', 'voice-only');
-      showToast('Voice-only mode enabled. Starting your training...', 'info');
-      initApp();
-    }
-
-    // PROFILE SETUP FUNCTIONS
-    let selectedGoal = '';
-    let selectedContext = 'both';
-
-    function selectGoal(btn) {
-      document.querySelectorAll('.goal-btn').forEach(b => {
-        b.style.background = '#141414';
-        b.style.borderColor = 'rgba(255,255,255,0.1)';
-        b.style.color = '#888';
-      });
-      btn.style.background = 'rgba(212,255,77,0.1)';
-      btn.style.borderColor = 'rgba(212,255,77,0.3)';
-      btn.style.color = '#d4ff4d';
-      selectedGoal = btn.dataset.goal;
-    }
-
-    function selectContext(btn) {
-      document.querySelectorAll('.context-btn').forEach(b => {
-        b.style.background = '#141414';
-        b.style.borderColor = 'rgba(255,255,255,0.1)';
-        b.style.color = '#888';
-      });
-      btn.style.background = 'rgba(212,255,77,0.1)';
-      btn.style.borderColor = 'rgba(212,255,77,0.3)';
-      btn.style.color = '#d4ff4d';
-      selectedContext = btn.dataset.ctx;
-    }
-
-    async function submitProfile(event) {
-      const name = document.getElementById('setup-name').value.trim();
-      const language = document.getElementById('setup-language').value;
-
-      if (!name) { showToast('Enter your name'); return; }
-      if (!selectedGoal) { showToast('Pick a speaking goal'); return; }
-      if (!language) { showToast('Select your native language'); return; }
-
-      const btn = event?.target || document.querySelector('button[onclick^="submitProfile"]');
-      if (btn) {
-        btn.textContent = 'Saving...';
-        btn.disabled = true;
-      }
-
-      try {
-        const res = await fetch('/api/user/create', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            name,
-            goal: selectedGoal,
-            nativeLanguage: language,
-            speakingContext: selectedContext
-          })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          localStorage.setItem('speakup-onboarded', 'true');
-          currentUser = data.user;
-          // Animate out
-          document.getElementById('profile-setup-screen').style.opacity = '0';
-          document.getElementById('profile-setup-screen').style.transition = 'opacity 0.3s';
-          setTimeout(() => {
-            document.getElementById('profile-setup-screen').style.display = 'none';
-            // Load progress with the new user data
-            loadProgress();
-            // Update UI immediately
-            updateUI();
-            renderStepper();
-            updateHabitContainer();
-          }, 350);
-        } else {
-          showToast('Error saving profile. Try again.');
-          if (btn) {
-            btn.textContent = 'Start my 15-day journey';
-            btn.disabled = false;
-          }
-        }
-      } catch(e) {
-        showToast('Server error. Is Node.js running?');
-        if (btn) {
-          btn.textContent = 'Start my 15-day journey';
-          btn.disabled = false;
-        }
-      }
-    }
-
-    // PROFILE PANEL FUNCTIONS
-    let profilePanelOpen = false;
-    let currentUser = null;
-
-    function toggleProfilePanel() {
-      profilePanelOpen = !profilePanelOpen;
-      const panel = document.getElementById('profile-panel');
-      const overlay = document.getElementById('profile-overlay');
-      panel.style.right = profilePanelOpen ? '0' : '-320px';
-      overlay.style.display = profilePanelOpen ? 'block' : 'none';
-      if (profilePanelOpen) loadProfilePanel();
-    }
-
-    async function loadProfilePanel() {
-      try {
-        const res = await fetch('/api/progress');
-        const data = await res.json();
-        if (!data.user) return;
-
-        const u = data.user;
-        const r = data.personalRecords;
-
-        // Avatar initial
-        const initial = u.name.charAt(0).toUpperCase();
-        document.getElementById('panel-avatar').textContent = initial;
-        document.getElementById('profile-avatar').textContent = initial;
-
-        document.getElementById('panel-name').textContent = u.name;
-        document.getElementById('panel-goal').textContent = u.goal;
-        document.getElementById('panel-day').textContent = u.current_day;
-        document.getElementById('panel-streak').textContent = u.streak;
-        document.getElementById('panel-best').textContent =
-          r?.best_overall_score ? r.best_overall_score.toFixed(1) : '—';
-        document.getElementById('panel-fillers').textContent =
-          r?.lowest_filler_rate < 99 ? r.lowest_filler_rate.toFixed(1)+'/min' : '—';
-        document.getElementById('panel-lang').textContent = u.native_language;
-        document.getElementById('panel-ctx').textContent = u.target_speaking_context;
-        document.getElementById('panel-start-date').textContent =
-          new Date(u.start_date).toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
-
-        // Filler trends
-        if (data.fillerTrends?.length > 0) {
-          document.getElementById('panel-fillers-list').innerHTML =
-            data.fillerTrends.slice(0,5).map(f => `
-              <div style="display:flex;justify-content:space-between;
-                padding:4px 0;border-bottom:0.5px solid rgba(255,255,255,0.04)">
-                <span style="color:#888">"${f.word}"</span>
-                <span style="color:#ffaa33;font-family:monospace">${f.total_count}×</span>
-              </div>
-            `).join('');
-        }
-      } catch(e) {
-        console.error('Profile load error:', e);
-      }
-    }
-
-    function confirmReset() {
-      const confirmed = window.confirm(
-        'Delete ALL your data? This cannot be undone.\n\nA backup will be saved to data/ before deletion.'
-      );
-      if (confirmed) {
-        fetch('/api/user/reset', { method: 'DELETE' })
-          .then(() => {
-            showToast('Data deleted. Backup saved. Reloading...');
-            setTimeout(() => location.reload(), 1500);
-          }).catch(console.error);
-      }
-    }
-
-    // Updated initApp to personalize with user's name
-    function initApp() {
-      fetch('/api/user').then(res => res.json()).then(data => {
-        console.log('API response:', data);
-        if (!data.exists) {
-          console.log('No user exists, showing profile setup');
-          // Show profile setup
-          document.getElementById('profile-setup-screen').style.display = 'flex';
-          return;
-        }
-
-        currentUser = data.user;
-
-        // Personalize UI with name
-        const initial = currentUser.name.charAt(0).toUpperCase();
-        const avatarEl = document.getElementById('profile-avatar');
-        if (avatarEl) avatarEl.textContent = initial;
-
-        // Update header
-        const dayBadge = document.getElementById('dayBadge');
-        if (dayBadge) dayBadge.textContent = `Day ${currentUser.current_day} of 15`;
-
-        const streakEl = document.getElementById('streakBadge');
-        if (streakEl) streakEl.textContent = `${currentUser.streak} day streak`;
-
-        // Load progress and start
-        loadProgress();
-        navigateToHabit(0);
-
-      }).catch(e => {
-        console.error('Init error:', e);
-        showToast('Could not connect to server. Is Node.js running?');
-      });
-    }
-
-    // Determine app start flow
-    if (localStorage.getItem('speakup-onboarded')) {
-      initApp();
-    } else {
-      // Avoid showing onboarding again for users who already created a profile
-      fetch('/api/user')
-        .then(res => res.json())
-        .then(data => {
-          if (data.exists) {
-            localStorage.setItem('speakup-onboarded', 'true');
-            initApp();
-          } else {
-            document.getElementById('onboarding-screen').style.display = 'flex';
-          }
-        })
-        .catch(() => {
-          document.getElementById('onboarding-screen').style.display = 'flex';
-        });
-    }
-
-    // Initialize UI components (always needed)
-    renderStepper();
-    updateHabitContainer();
-  </script>
 </body>
 </html>

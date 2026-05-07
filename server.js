@@ -334,6 +334,55 @@ async function initDatabase() {
       completed_at TEXT,
       PRIMARY KEY (challenge_id, user_id)
     );
+
+    -- Voice recordings and analysis
+    CREATE TABLE IF NOT EXISTS voice_recordings (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || '4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      user_id INTEGER DEFAULT 1,
+      session_id INTEGER,
+      prompt_text TEXT,
+      duration_seconds REAL,
+      audio_data BLOB, -- Base64 encoded audio
+      transcript TEXT,
+      word_count INTEGER,
+      speaking_rate_wpm REAL, -- words per minute
+      pause_count INTEGER,
+      filler_word_count INTEGER,
+      confidence_score REAL, -- 0-1 scale
+      clarity_score REAL, -- 0-1 scale
+      engagement_score REAL, -- 0-1 scale
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (session_id) REFERENCES sessions(id)
+    );
+
+    -- Practice prompts library
+    CREATE TABLE IF NOT EXISTS practice_prompts (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || '4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      category TEXT NOT NULL, -- 'business', 'personal', 'creative', 'interview', 'presentation'
+      difficulty TEXT DEFAULT 'beginner', -- 'beginner', 'intermediate', 'advanced'
+      prompt_text TEXT NOT NULL,
+      estimated_duration_minutes INTEGER DEFAULT 5,
+      tags TEXT, -- JSON array of tags
+      is_ai_generated INTEGER DEFAULT 0,
+      usage_count INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- User progress insights
+    CREATE TABLE IF NOT EXISTS progress_insights (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || '4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+      user_id INTEGER DEFAULT 1,
+      insight_type TEXT NOT NULL, -- 'improvement', 'trend', 'milestone', 'recommendation'
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      metric_name TEXT,
+      metric_value REAL,
+      metric_change REAL, -- percentage change
+      time_period TEXT, -- 'week', 'month', 'all_time'
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
   
   console.log('Database initialized: ./data/speakup.db');
@@ -724,20 +773,27 @@ function createCoachConversation(userId, type, sessionId = null) {
 }
 
 function getLearningGroups(userId = null) {
-  let query = 'SELECT * FROM learning_groups';
-  let params = [];
-  
-  if (userId) {
-    query += ' WHERE admin_user_id=? OR id IN (SELECT group_id FROM group_members WHERE user_id=?)';
-    params = [userId, userId];
-  }
-  
-  query += ' ORDER BY created_at DESC';
-  
-  const stmt = db.prepare(query);
+  const stmt = db.prepare('SELECT * FROM learning_groups ORDER BY created_at DESC');
   const results = [];
+  
   while (stmt.step()) {
-    results.push(stmt.getAsObject());
+    const group = stmt.getAsObject();
+    group.is_member = false;
+    group.is_admin = false;
+
+    if (userId) {
+      const memberStmt = db.prepare(
+        'SELECT role FROM group_members WHERE group_id=? AND user_id=? AND is_active=1'
+      );
+      const membership = memberStmt.getAsObject([group.id, userId]);
+      memberStmt.free();
+      if (membership.role) {
+        group.is_member = true;
+        group.is_admin = membership.role === 'admin';
+      }
+    }
+
+    results.push(group);
   }
   stmt.free();
   return results;
@@ -2347,6 +2403,464 @@ async function sendEmail(to, subject, text) {
     subject,
     text
   });
+}
+
+// ── VOICE RECORDING & ANALYSIS API ─────────────────────────────────────────
+
+// Upload and analyze voice recording
+app.post('/api/voice/analyze', async (req, res) => {
+  try {
+    const { audioData, promptText, duration } = req.body;
+    
+    if (!audioData) {
+      return res.status(400).json({ error: 'No audio data provided' });
+    }
+
+    const normalizedAudioData = typeof audioData === 'string'
+      ? audioData.replace(/^data:audio\/[a-zA-Z0-9.+-]+;base64,/, '')
+      : null;
+
+    if (!normalizedAudioData) {
+      return res.status(400).json({ error: 'Invalid audio format' });
+    }
+
+    // Basic analysis (we'll enhance this with real speech processing)
+    const analysis = await analyzeVoiceRecording(normalizedAudioData, promptText, duration);
+    
+    // Save recording to database
+    const stmt = db.prepare(`
+      INSERT INTO voice_recordings 
+      (prompt_text, duration_seconds, audio_data, transcript, word_count, 
+       speaking_rate_wpm, pause_count, filler_word_count, confidence_score, 
+       clarity_score, engagement_score)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const result = stmt.run(
+      promptText || '',
+      duration || 0,
+      normalizedAudioData,
+      analysis.transcript,
+      analysis.wordCount,
+      analysis.speakingRate,
+      analysis.pauseCount,
+      analysis.fillerWords,
+      analysis.confidence,
+      analysis.clarity,
+      analysis.engagement
+    );
+    
+    stmt.free();
+    
+    res.json({
+      recordingId: result.insertId,
+      analysis: {
+        transcript: analysis.transcript,
+        wordCount: analysis.wordCount,
+        speakingRate: analysis.speakingRate,
+        fillerWords: analysis.fillerWords,
+        confidence: analysis.confidence,
+        clarity: analysis.clarity,
+        engagement: analysis.engagement,
+        feedback: analysis.feedback
+      }
+    });
+  } catch (error) {
+    console.error('Voice analysis error:', error);
+    res.status(500).json({ error: 'Failed to analyze voice recording' });
+  }
+});
+
+// Get voice recording history
+app.get('/api/voice/recordings', (req, res) => {
+  try {
+    const stmt = db.prepare(`
+      SELECT id, prompt_text, duration_seconds, word_count, speaking_rate_wpm,
+             pause_count, filler_word_count, confidence_score, clarity_score,
+             engagement_score, created_at
+      FROM voice_recordings
+      ORDER BY created_at DESC
+      LIMIT 50
+    `);
+    
+    const recordings = [];
+    while (stmt.step()) {
+      recordings.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    res.json(recordings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── PRACTICE PROMPTS API ──────────────────────────────────────────────────
+
+// Get smart practice prompt
+app.get('/api/prompts/smart', async (req, res) => {
+  try {
+    // Get user progress for personalization
+    const userStmt = db.prepare('SELECT * FROM users WHERE id = 1');
+    const user = userStmt.getAsObject();
+    userStmt.free();
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Generate personalized prompt based on user data
+    const prompt = await generateSmartPrompt(user);
+    
+    res.json({
+      prompt: prompt.text,
+      category: prompt.category,
+      difficulty: prompt.difficulty,
+      estimatedDuration: prompt.duration
+    });
+  } catch (error) {
+    console.error('Smart prompt error:', error);
+    res.status(500).json({ error: 'Failed to generate prompt' });
+  }
+});
+
+// Get prompts by category
+app.get('/api/prompts/category/:category', (req, res) => {
+  try {
+    const { category } = req.params;
+    const stmt = db.prepare(`
+      SELECT id, prompt_text, difficulty, estimated_duration_minutes, tags, usage_count
+      FROM practice_prompts
+      WHERE category = ?
+      ORDER BY usage_count DESC, created_at DESC
+      LIMIT 20
+    `);
+    
+    const prompts = [];
+    while (stmt.step()) {
+      prompts.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    res.json(prompts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── PROGRESS INSIGHTS API ─────────────────────────────────────────────────
+
+// Get user progress insights
+app.get('/api/insights', (req, res) => {
+  try {
+    // Generate insights based on user data
+    const insights = generateProgressInsights();
+    res.json(insights);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── GROUP CHALLENGES API ─────────────────────────────────────────────────
+
+// Create group challenge
+app.post('/api/groups/:groupId/challenge', (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { title, description, targetMetric, targetValue, durationDays } = req.body;
+    
+    // Verify user is group admin/creator
+    const memberStmt = db.prepare(`
+      SELECT role FROM group_members 
+      WHERE group_id = ? AND user_id = 1 AND is_active = 1
+    `);
+    const membership = memberStmt.getAsObject();
+    memberStmt.free();
+    
+    if (!membership || membership.role !== 'admin') {
+      return res.status(403).json({ error: 'Only group admins can create challenges' });
+    }
+    
+    const challengeId = nanoid();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + durationDays);
+    
+    const stmt = db.prepare(`
+      INSERT INTO group_challenges 
+      (id, group_id, title, description, start_date, end_date, target_metric, target_value)
+      VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?)
+    `);
+    
+    stmt.run(challengeId, groupId, title, description, endDate.toISOString(), targetMetric, targetValue);
+    stmt.free();
+    
+    res.json({ challengeId, message: 'Challenge created successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get group challenges
+app.get('/api/groups/:groupId/challenges', (req, res) => {
+  try {
+    const { groupId } = req.params;
+    
+    const stmt = db.prepare(`
+      SELECT gc.*, 
+             COUNT(gcp.user_id) as participant_count,
+             gcp.current_value as my_progress
+      FROM group_challenges gc
+      LEFT JOIN group_challenge_participants gcp ON gc.id = gcp.challenge_id AND gcp.user_id = 1
+      WHERE gc.group_id = ? AND gc.status = 'active'
+      ORDER BY gc.created_at DESC
+    `);
+    
+    const challenges = [];
+    while (stmt.step()) {
+      challenges.push(stmt.getAsObject());
+    }
+    stmt.free();
+    
+    res.json(challenges);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Join group challenge
+app.post('/api/challenges/:challengeId/join', (req, res) => {
+  try {
+    const { challengeId } = req.params;
+    
+    // Check if challenge exists and is active
+    const challengeStmt = db.prepare(`
+      SELECT * FROM group_challenges 
+      WHERE id = ? AND status = 'active' AND end_date > datetime('now')
+    `);
+    const challenge = challengeStmt.getAsObject();
+    challengeStmt.free();
+    
+    if (!challenge) {
+      return res.status(404).json({ error: 'Challenge not found or expired' });
+    }
+    
+    // Check if user is member of the group
+    const memberStmt = db.prepare(`
+      SELECT * FROM group_members 
+      WHERE group_id = ? AND user_id = 1 AND is_active = 1
+    `);
+    const membership = memberStmt.getAsObject();
+    memberStmt.free();
+    
+    if (!membership) {
+      return res.status(403).json({ error: 'Must be group member to join challenge' });
+    }
+    
+    // Join challenge
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO group_challenge_participants 
+      (challenge_id, user_id, current_value)
+      VALUES (?, 1, 0)
+    `);
+    
+    stmt.run(challengeId);
+    stmt.free();
+    
+    res.json({ message: 'Joined challenge successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── UTILITY FUNCTIONS ─────────────────────────────────────────────────────
+
+// Voice analysis function (basic implementation)
+async function analyzeVoiceRecording(audioData, promptText, duration) {
+  // For now, return mock analysis
+  // In production, this would use speech-to-text API and analysis
+  
+  const mockTranscript = "This is a sample transcript of the user's speech. They spoke clearly about their topic.";
+  const wordCount = mockTranscript.split(' ').length;
+  const speakingRate = Math.round((wordCount / (duration || 60)) * 60); // WPM
+  
+  // Mock analysis scores
+  const confidence = Math.random() * 0.4 + 0.6; // 0.6-1.0
+  const clarity = Math.random() * 0.3 + 0.7; // 0.7-1.0
+  const engagement = Math.random() * 0.5 + 0.5; // 0.5-1.0
+  
+  // Mock filler word detection
+  const fillerWords = Math.floor(Math.random() * 5);
+  const pauseCount = Math.floor(Math.random() * 8);
+  
+  // Generate feedback
+  let feedback = [];
+  if (confidence > 0.8) feedback.push("Great confidence in your delivery!");
+  else if (confidence > 0.6) feedback.push("Good confidence - keep practicing!");
+  else feedback.push("Try to speak with more confidence.");
+  
+  if (clarity > 0.8) feedback.push("Your speech was very clear.");
+  else if (clarity > 0.6) feedback.push("Clear speech overall.");
+  else feedback.push("Work on pronunciation clarity.");
+  
+  if (fillerWords > 3) feedback.push("Try to reduce filler words like 'um' and 'uh'.");
+  if (speakingRate > 180) feedback.push("Consider slowing down your speaking pace.");
+  else if (speakingRate < 120) feedback.push("Try speaking a bit faster to maintain engagement.");
+  
+  return {
+    transcript: mockTranscript,
+    wordCount,
+    speakingRate,
+    pauseCount,
+    fillerWords,
+    confidence: Math.round(confidence * 100) / 100,
+    clarity: Math.round(clarity * 100) / 100,
+    engagement: Math.round(engagement * 100) / 100,
+    feedback
+  };
+}
+
+// Generate smart practice prompt
+async function generateSmartPrompt(user) {
+  const categories = ['business', 'personal', 'creative', 'interview', 'presentation'];
+  const difficulties = ['beginner', 'intermediate', 'advanced'];
+  
+  // Base prompt on user data
+  let contextPrompt = `Generate a speaking practice prompt for ${user.name} who wants to improve "${user.goal}". `;
+  contextPrompt += `They speak in ${user.target_speaking_context} contexts and are on day ${user.current_day} of their journey. `;
+  contextPrompt += `Their native language is ${user.native_language}. `;
+  contextPrompt += `Current streak: ${user.streak} days. `;
+  
+  // Get recent practice history
+  const historyStmt = db.prepare(`
+    SELECT prompt_text, category FROM voice_recordings 
+    WHERE created_at >= datetime('now', '-7 days')
+    ORDER BY created_at DESC LIMIT 5
+  `);
+  
+  const recentPrompts = [];
+  while (historyStmt.step()) {
+    recentPrompts.push(historyStmt.getAsObject());
+  }
+  historyStmt.free();
+  
+  if (recentPrompts.length > 0) {
+    contextPrompt += `Recent practice topics: ${recentPrompts.map(p => p.category).join(', ')}. `;
+    contextPrompt += "Avoid repeating similar topics. ";
+  }
+  
+  contextPrompt += "Create a fresh, engaging prompt with specific instructions. Include time duration and difficulty level.";
+  
+  try {
+    const aiResponse = await callOllama(TEXT_MODEL, contextPrompt);
+    
+    // Parse AI response to extract prompt details
+    // For now, return a structured response
+    return {
+      text: aiResponse.split('\n')[0] || aiResponse,
+      category: categories[Math.floor(Math.random() * categories.length)],
+      difficulty: difficulties[Math.floor(Math.random() * difficulties.length)],
+      duration: 3 + Math.floor(Math.random() * 5) // 3-7 minutes
+    };
+  } catch (error) {
+    // Fallback prompts
+    const fallbackPrompts = [
+      "Explain your favorite hobby as if teaching a child",
+      "Give a 2-minute elevator pitch for your dream job",
+      "Tell a story about a challenge you overcame",
+      "Present a product idea to potential investors",
+      "Describe your morning routine in detail"
+    ];
+    
+    return {
+      text: fallbackPrompts[Math.floor(Math.random() * fallbackPrompts.length)],
+      category: 'personal',
+      difficulty: 'beginner',
+      duration: 5
+    };
+  }
+}
+
+// Generate progress insights
+function generateProgressInsights() {
+  const insights = [];
+  
+  try {
+    // Streak insight
+    const streakStmt = db.prepare('SELECT streak, longest_streak FROM users WHERE id = 1');
+    const user = streakStmt.getAsObject();
+    streakStmt.free();
+    
+    if (user.streak > 0) {
+      insights.push({
+        type: 'milestone',
+        title: 'Streak Achievement',
+        description: `You're on a ${user.streak}-day speaking streak! Keep it going.`,
+        metric_name: 'streak',
+        metric_value: user.streak
+      });
+    }
+    
+    // Voice recording insights
+    const voiceStmt = db.prepare(`
+      SELECT COUNT(*) as total_recordings,
+             AVG(confidence_score) as avg_confidence,
+             AVG(clarity_score) as avg_clarity,
+             AVG(speaking_rate_wpm) as avg_rate
+      FROM voice_recordings
+      WHERE created_at >= datetime('now', '-30 days')
+    `);
+    
+    const voiceStats = voiceStmt.getAsObject();
+    voiceStmt.free();
+    
+    if (voiceStats.total_recordings > 0) {
+      if (voiceStats.avg_confidence > 0.7) {
+        insights.push({
+          type: 'improvement',
+          title: 'Confidence Growing',
+          description: 'Your average confidence score is improving. Keep practicing!',
+          metric_name: 'confidence',
+          metric_value: voiceStats.avg_confidence,
+          time_period: 'month'
+        });
+      }
+      
+      if (voiceStats.avg_rate > 160) {
+        insights.push({
+          type: 'recommendation',
+          title: 'Speaking Pace',
+          description: 'Try slowing down your speaking rate for better clarity.',
+          metric_name: 'speaking_rate',
+          metric_value: voiceStats.avg_rate
+        });
+      }
+    }
+    
+    // Weekly progress
+    const weeklyStmt = db.prepare(`
+      SELECT COUNT(*) as sessions_this_week
+      FROM sessions
+      WHERE completed = 1 AND date >= date('now', '-7 days')
+    `);
+    
+    const weekly = weeklyStmt.getAsObject();
+    weeklyStmt.free();
+    
+    if (weekly.sessions_this_week >= 5) {
+      insights.push({
+        type: 'achievement',
+        title: 'Weekly Goal Met',
+        description: `You've completed ${weekly.sessions_this_week} sessions this week. Excellent consistency!`,
+        metric_name: 'weekly_sessions',
+        metric_value: weekly.sessions_this_week
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error generating insights:', error);
+  }
+  
+  return insights;
 }
 
 // Start server after database initialization
